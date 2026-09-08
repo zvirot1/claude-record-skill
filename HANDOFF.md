@@ -1,5 +1,8 @@
 # HANDOFF — context for Claude continuing this project on another machine
 
+Read `SESSION-LOG.md` alongside this file: it explains how the built-in feature works internally,
+why the design is what it is, and which bugs were already found and fixed (do not reintroduce them).
+
 ## What exists
 - `skills/record-skill/scripts/record.py`: recorder built on `mss` + `pynput` + `Pillow`.
   Screenshot after every click, Enter/Tab/Esc and modifier shortcut, plus a keyframe every 5 s when

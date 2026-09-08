@@ -68,12 +68,17 @@ cd cowork-plugin/record-skill-local && zip -r ../dist/record-skill-local.plugin 
 You still run `record.py` yourself on the host; only the drafted skill crosses into Cowork, and
 only if it does not depend on desktop clicks (the VM cannot click on your desktop).
 
+## Background
+
+`SESSION-LOG.md` records how this was built: what the built-in feature does internally, why the
+design looks like this, and the three bugs that only showed up in a live recording test.
+
 ## Continuing work on another machine (handoff for Claude)
 
 Open the cloned repo as the working folder in Claude Code and paste:
 
-> Read `HANDOFF.md` and run the verification steps for this OS. Fix anything that fails directly in
-> `skills/record-skill/`, re-run `install.*`, and commit the fixes.
+> Read `HANDOFF.md` and `SESSION-LOG.md`, then run the verification steps for this OS. Fix anything
+> that fails directly in `skills/record-skill/`, re-run `install.*`, and commit the fixes.
 
 ## Status
 
