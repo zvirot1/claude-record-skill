@@ -18,8 +18,13 @@ record-skill-local/
 
 ## Install
 
-Accept the `.plugin` file in chat, or drop the folder into your plugins directory.
-Then start a new session and type `/record-skill`.
+Accept the `.plugin` file in chat (press **Save plugin**), then start a **new** session -
+plugins load at session start.
+
+Two ways to invoke it:
+- `/record-skill` - the slash command.
+- Just describe the task: "turn the recording in <folder> into a skill saved on my machine".
+  The skill triggers from its description, which is the more reliable route in Cowork.
 
 ## The one thing to know
 

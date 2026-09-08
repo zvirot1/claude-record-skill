@@ -86,3 +86,21 @@ Rebuild after editing the skill:
 cp skills/record-skill/scripts/*.py cowork-plugin/record-skill-local/skills/record-skill/scripts/
 cd cowork-plugin/record-skill-local && zip -r ../dist/record-skill-local.plugin . -x "*.DS_Store"
 ```
+
+### Cowork verification (2026-09-08) - what actually works
+The plugin installs correctly: it appears in
+`local-agent-mode-sessions/<account>/<session>/rpm/manifest.json` as `record-skill-local`
+(marketplace "My Uploads", `updatedAtVerified: true`) and materialises under `rpm/plugin_<id>/`.
+
+**Skills in `skills/` are NOT exposed as slash commands in Cowork.** Both `/record-skill` and
+`/record-skill-local:record-skill` returned "Unknown skill" with the plugin fully installed - the
+`<plugin>:<skill>` form is Claude Code's convention, not Cowork's. Slash commands come only from
+`commands/*.md` (the "legacy" format), so v0.2.0 adds `commands/record-skill.md`, a thin wrapper
+that reads `${CLAUDE_PLUGIN_ROOT}/skills/record-skill/SKILL.md` and follows it.
+
+**Description-based triggering works, and works well.** Asked in plain Hebrew to turn a recording
+folder into a local skill, Cowork loaded the skill, read both recordings from the host (via its
+Windows-MCP integration - so the host filesystem IS reachable from Cowork), and correctly refused
+to invent a workflow: it reported 14.8s, 1 click, 11 keystrokes, "meaningless letter sequences",
+no files opened or saved, and asked for a real recording instead. That is exactly the behaviour
+step 2 of the skill prescribes.
