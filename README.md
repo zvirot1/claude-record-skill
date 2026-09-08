@@ -54,6 +54,20 @@ screenshots, plus typed/clicked actions, and then tells Claude to call the Cowor
 `propose_skills` / `save_skill`, which store the skill in the account. `record.py` produces the
 same trajectory format; `SKILL.md` forbids those two tools and writes files instead.
 
+## Cowork
+
+Cowork runs its tools inside a Linux VM with no access to the host desktop, so the recorder
+cannot run there - and Cowork does not read `~/.claude/skills` at all; it loads skills from
+plugins. `cowork-plugin/record-skill-local/` wraps the skill as a plugin for exactly that, and
+`cowork-plugin/dist/record-skill-local.plugin` is the installable file. Rebuild it with:
+
+```bash
+cd cowork-plugin/record-skill-local && zip -r ../dist/record-skill-local.plugin . -x "*.DS_Store"
+```
+
+You still run `record.py` yourself on the host; only the drafted skill crosses into Cowork, and
+only if it does not depend on desktop clicks (the VM cannot click on your desktop).
+
 ## Continuing work on another machine (handoff for Claude)
 
 Open the cloned repo as the working folder in Claude Code and paste:

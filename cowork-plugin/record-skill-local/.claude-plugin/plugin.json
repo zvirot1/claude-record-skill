@@ -1,0 +1,10 @@
+{
+  "name": "record-skill-local",
+  "version": "0.1.0",
+  "description": "Turn a recorded desktop workflow into a reusable skill that stays on this machine - the on-device twin of the built-in \"Record a skill\", which saves to the cloud account instead.",
+  "author": {
+    "name": "zvirot1"
+  },
+  "license": "MIT",
+  "keywords": ["record", "skill", "demonstration", "workflow", "local", "screen-recording"]
+}
