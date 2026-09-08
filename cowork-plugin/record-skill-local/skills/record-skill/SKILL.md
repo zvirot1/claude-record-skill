@@ -14,9 +14,13 @@ account, which is exactly what this skill exists to avoid. Write files instead.
 
 ## Where you are running matters
 
-Cowork executes tools inside a Linux VM. It has no access to the Windows or macOS desktop, so
-**you cannot record the screen yourself** — `mss` and `pynput` have no display there and cannot
-see the user's windows. The recorder always runs on the user's own machine, in their own terminal.
+Cowork executes tools inside a Linux VM, so **you cannot record the screen yourself** — `mss`
+and `pynput` have no display there and cannot see the user's windows. The recorder always runs on
+the user's own machine, in their own terminal.
+
+The host filesystem may still be reachable — Cowork has read recording folders under the user's
+home directory through its Windows-MCP integration — so try the path before asking for a paste.
+Reading a finished recording is fine; capturing the screen is not.
 
 Establish which case you are in before doing anything else:
 

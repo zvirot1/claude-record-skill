@@ -28,8 +28,10 @@ Two ways to invoke it:
 
 ## The one thing to know
 
-Cowork runs its tools inside a Linux VM with no access to your desktop, so **Claude cannot
-record your screen for you**. You run the recorder yourself, in your own terminal:
+Cowork runs its tools inside a Linux VM, so **Claude cannot record your screen for you** — no
+display there, nothing for `mss` and `pynput` to see. Reading a finished recording off your disk
+does work (Cowork reached the recording folders through its Windows-MCP integration), but the
+recording itself you run yourself, in your own terminal:
 
 ```powershell
 py -3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\record.py"
