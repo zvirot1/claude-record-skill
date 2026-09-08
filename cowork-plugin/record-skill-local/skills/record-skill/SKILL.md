@@ -1,6 +1,6 @@
 ---
 name: record-skill
-description: Turn a demonstrated desktop workflow into a reusable skill that stays on this machine, never in the cloud account. Use when the user says "record a skill", "record my screen into a skill", "teach Claude this workflow", "make a skill from what I just did", "turn this recording into a skill", "הקלט skill", "תלמד מההקלטה", pastes a <watch-record-demonstration> block, points at a recording folder, or wants a skill saved locally / on their own machine / as a plugin instead of to their account. Never call save_skill or propose_skills.
+description: Turn a demonstrated desktop workflow into a reusable skill that stays on this machine, never in the cloud account. Use when the user says "record a skill", "record my screen into a skill", "teach Claude this workflow", "make a skill from what I just did", "turn this recording into a skill", "הקלט skill", "תלמד מההקלטה", pastes a watch-record-demonstration trajectory block, points at a recording folder, or wants a skill saved locally / on their own machine / as a plugin instead of to their account. Never call save_skill or propose_skills.
 ---
 
 # Record a skill (local)

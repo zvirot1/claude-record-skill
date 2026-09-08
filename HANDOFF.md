@@ -64,3 +64,25 @@ callbacks, a Windows-only DPI call), but re-run the macOS live test when you pul
 
 Fix issues directly in `skills/record-skill/`, re-run `install.ps1`, commit and push. Then on the Mac:
 `git pull && ./install.sh`.
+
+## Cowork packaging (2026-09-08)
+`cowork-plugin/record-skill-local/` wraps the skill as a Cowork plugin; the installable file is
+`cowork-plugin/dist/record-skill-local.plugin` (a zip with the manifest at the root). Cowork's
+plugin preview parsed it correctly on the first try - it listed every bundled file.
+
+**Cowork's skill validator is stricter than Claude Code's**: it rejects a `description`
+containing XML tags. `<watch-record-demonstration>` in the description failed with
+"SKILL.md description cannot contain XML tags"; it is now written without angle brackets in
+both copies of the skill. Claude Code loads either form, so this only shows up when packaging.
+
+Cowork loads skills from plugins, never from `~/.claude/skills` - its own skills come from an
+account-synced plugin under `AppData\Roaming\Claude\local-agent-mode-sessions\skills-plugin\`
+with a `manifest.json` of skillId/creatorType/enabled. Cowork also runs its tools in a Linux
+microVM (`rootfs.vhdx` + `vmlinuz`, see `logs/cowork_vm_node.log`), so `record.py` cannot capture
+the host screen from there - the recorder always runs on the host.
+
+Rebuild after editing the skill:
+```bash
+cp skills/record-skill/scripts/*.py cowork-plugin/record-skill-local/skills/record-skill/scripts/
+cd cowork-plugin/record-skill-local && zip -r ../dist/record-skill-local.plugin . -x "*.DS_Store"
+```
