@@ -50,6 +50,13 @@ Output lands in `~/.claude/recordings/<timestamp>/` with `trajectory.md`, `event
 `shots/*.jpg`, `meta.json`. Read `trajectory.md`, then Read the referenced images that matter
 (clicks, final states). Do not read all 50 images blindly; sample around each action.
 
+Before analysing, check the recording is usable. `"screenCaptureFailing": true` in `meta.json`
+means the screen could not be grabbed (locked session, disconnected RDP, missing macOS Screen
+Recording permission) and the trajectory has actions but no images. `{"type": "error"}` lines in
+`events.jsonl`, no keyboard events at all, or a recording that ran its full `--duration` when the
+user says they pressed the stop hotkey all mean the same thing: say so and offer to re-record.
+Never fill the gap by guessing what the workflow was.
+
 **B. Pasted desktop-app recording.** The desktop app's recorder produces a
 `<watch-record-demonstration durationMs steps images platform>` block: lines like
 `[1.2s] full screen (...)` / `[3.4s] changed region (...)` followed by images, plus

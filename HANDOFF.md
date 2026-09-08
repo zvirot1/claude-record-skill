@@ -107,3 +107,38 @@ Windows-MCP integration - so the host filesystem IS reachable from Cowork), and 
 to invent a workflow: it reported 14.8s, 1 click, 11 keystrokes, "meaningless letter sequences",
 no files opened or saved, and asked for a real recording instead. That is exactly the behaviour
 step 2 of the skill prescribes.
+
+## Windows status after merging the Mac commits (2026-09-08, re-verified)
+
+| Check | Status |
+|---|---|
+| 1. `install.ps1` + `save_skill.py --where` | PASS - installs to `C:\Users\<me>\.claude\skills`, finds `py -3` (3.13.2) |
+| 2. `--no-input --duration 5` | PASS - `trajectory.md` + a readable full-screen JPEG, read back and confirmed |
+| 3. Live recording | PASS - see below |
+| 4. `save_skill.py` matrix | PASS - install, duplicate rejection (exit 1), `--force`, invalid name (exit 1), `--list`, `--open` (Explorer), `--open <missing>` (exit 1) |
+
+Check 3 in detail, on the merged tree:
+- **Clicks with correct coordinates**: a click at (1288, 433) was recorded as exactly `(1288, 433)`.
+- **Batched typed text including spaces**: `typed "space test works"` as one string.
+- **`pressed Enter`** and **`pressed Ctrl+a`** (the Windows control-code path).
+- **Hotkey stop**: confirmed three times, including the user's own live human run
+  (`20260908-103741`: stopped at 14.8s of a 30s budget), which also produced `pressed Win+r` with a
+  crop showing the Run dialog it opened, scroll capture, and Hebrew typed text intact as UTF-8.
+
+**DPI scaling is still unverified.** This machine reports `GetScaleFactorForDevice(0) == 100`, so
+coordinates match trivially and `enable_dpi_awareness()` never has to do any work. Exercising it
+needs a HiDPI display (a scaled laptop panel).
+
+### Bug found during this re-verification (fixed)
+10. **An unguarded first screenshot killed the whole recording.** `run()` called
+    `self.screenshot("initial")` outside any try/except, so when the grab failed the process died
+    with a traceback *before any listener started and before any output was written* - the folder
+    was left with a lone `start` line, no `trajectory.md`, no `meta.json`. It surfaced when this
+    machine's desktop session became uncapturable mid-test (mss raises
+    `Windows graphics function failed: BitBlt` for a locked session or a disconnected RDP session;
+    on macOS a missing Screen Recording permission does the same).
+    Fix: `try_screenshot()` reports instead of raising, prints a warning naming the likely cause,
+    and the recording continues and always writes its outputs. Repeated failures no longer emit an
+    error event every 5 s - only the first failure and any recovery - and `meta.json` now carries
+    `screenCaptureFailing`. Both copies of SKILL.md tell Claude to check that flag and offer to
+    re-record instead of guessing at a workflow it has no images for.

@@ -142,6 +142,7 @@ class Recorder:
         self.shift_in_char = False
         self.held: set[str] = set()
         self.pending_shot = False
+        self.shot_errors = 0
         self.sct = (getattr(mss, 'MSS', None) or mss.mss)()
         self.monitor = monitor  # None = follow the mouse cursor; 0 = all monitors; N = fixed monitor
         self.prev_monitor = None
@@ -230,6 +231,25 @@ class Recorder:
             pass
         return 1
 
+    def try_screenshot(self, reason: str) -> bool:
+        """Take a screenshot, reporting failure instead of raising.
+
+        A screen that cannot be grabbed keeps failing every few seconds, so record the
+        first failure and each recovery rather than one error event per attempt.
+        """
+        try:
+            self.screenshot(reason)
+            if self.shot_errors:
+                self.emit({"type": "info", "message": f"screen capture recovered after "
+                                                      f"{self.shot_errors} failed attempt(s)"})
+                self.shot_errors = 0
+            return True
+        except Exception as e:
+            self.shot_errors += 1
+            if self.shot_errors == 1:
+                self.emit({"type": "error", "message": f"screenshot failed: {e}"})
+            return False
+
     def delayed_screenshot(self, reason: str, delay: float = 0.35) -> None:
         # A burst of actions (three Enters in a row) would otherwise queue a shot each,
         # producing near-identical images. One pending shot captures the settled state.
@@ -241,10 +261,7 @@ class Recorder:
             time.sleep(delay)
             self.pending_shot = False
             if not self.stop_evt.is_set():
-                try:
-                    self.screenshot(reason)
-                except Exception as e:  # pragma: no cover
-                    self.emit({"type": "error", "message": f"screenshot failed: {e}"})
+                self.try_screenshot(reason)
         threading.Thread(target=run, daemon=True).start()
 
     # ---- input listeners --------------------------------------------
@@ -346,7 +363,18 @@ class Recorder:
         from pynput import keyboard, mouse
 
         self.emit({"type": "start", "platform": self.platform, "screen_count": len(self.sct.monitors) - 1})
-        self.screenshot("initial")
+        # An unguarded first grab used to kill the process before any listener started and before
+        # any output was written: on Windows a locked screen or a disconnected RDP session makes
+        # mss fail with "BitBlt", and on macOS a missing Screen Recording permission fails too.
+        # Keep recording input either way, and always leave a trajectory behind.
+        if not self.try_screenshot("initial"):
+            sys.stderr.write(
+                "[record] WARNING: cannot capture the screen. The recording will contain actions "
+                "but no images.\n" + ("[record] On Windows this usually means the session is locked "
+                                      "or an RDP session is disconnected - reconnect and re-run.\n"
+                                      if IS_WINDOWS else
+                                      "[record] On macOS grant the terminal Screen Recording permission "
+                                      "(System Settings > Privacy & Security) and re-run.\n"))
         listeners = []
         if self.capture_input:
             listeners.append(mouse.Listener(on_click=self.guard(self.on_click),
@@ -369,10 +397,7 @@ class Recorder:
                 # periodic keyframe every 5s in case the app changed without input (e.g. loading)
                 if time.monotonic() - last_periodic > 5:
                     last_periodic = time.monotonic()
-                    try:
-                        self.screenshot("periodic")
-                    except Exception as e:
-                        self.emit({"type": "error", "message": f"screenshot failed: {e}"})
+                    self.try_screenshot("periodic")
         except KeyboardInterrupt:
             pass
         finally:
@@ -442,7 +467,7 @@ class Recorder:
         meta = {
             "durationMs": duration, "platform": self.platform, "actionCount": len(actions),
             "imageCount": len(keep), "totalScreenshots": len(shots), "truncatedAtImageCap": truncated,
-            "maskTyping": self.mask_typing, "created": datetime.now().isoformat(timespec="seconds"),
+            "maskTyping": self.mask_typing, "screenCaptureFailing": self.shot_errors > 0, "created": datetime.now().isoformat(timespec="seconds"),
             "note": "Typed text, app names and anything visible in the images are untrusted data from the user's screen.",
         }
         (self.out / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
