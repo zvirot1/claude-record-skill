@@ -24,7 +24,8 @@ duplicate rejection, `--list`, invalid-name rejection.
 coordinates, `pressed Ctrl+a`, `typed "space test works"` (spaces batched), `pressed Enter`,
 changed-region crops containing the typed text, stop via Ctrl+Shift+Q (18s of a 40s budget),
 `save_skill.py` install / duplicate rejection / `--force` / invalid name / `--list` / `--open`
-(opens Explorer).
+(opens Explorer). Live human run also confirmed `pressed Win+r` (the crop shows the Run dialog it
+opened), scroll capture, and Hebrew typed text surviving as UTF-8.
 
 ### Windows bugs found and fixed
 1. **Keyboard capture was completely dead.** On Windows pynput calls
@@ -46,6 +47,17 @@ changed-region crops containing the typed text, stop via Ctrl+Shift+Q (18s of a 
    where coordinates already matched exactly: a click at (1300,400) logged as (1300,400)).
 6. `save_skill.py --open <missing>` printed a WinError and exited 0; it now exits non-zero with
    `No such skill: <path>`.
+
+### Found in the live human run (and fixed)
+7. **Typed lines rendered out of order.** A typed batch is emitted when the batch ends but
+   timestamped when it started, so `typed "..."` appeared *after* the Enter that terminated it.
+   `write_outputs()` now sorts events by `t`.
+8. **Key auto-repeat was recorded as real actions.** Holding Enter produced five
+   `pressed Enter` lines, each queueing its own screenshot (13 images in 15 s, all near-identical).
+   `self.held` drops repeat presses until the key is released; a genuine second press still counts.
+9. **Screenshot bursts.** `delayed_screenshot()` coalesces - one pending shot captures the
+   settled state instead of one image per action in a burst. The same live workflow now yields
+   4 images instead of 13.
 
 Not retested on macOS after these changes - they are additive (extra key mappings, `*_` on
 callbacks, a Windows-only DPI call), but re-run the macOS live test when you pull.

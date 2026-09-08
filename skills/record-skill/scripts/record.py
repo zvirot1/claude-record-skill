@@ -140,6 +140,8 @@ class Recorder:
         self.typed_t: int | None = None
         self.pressed_mods: set[str] = set()
         self.shift_in_char = False
+        self.held: set[str] = set()
+        self.pending_shot = False
         self.sct = (getattr(mss, 'MSS', None) or mss.mss)()
         self.monitor = monitor  # None = follow the mouse cursor; 0 = all monitors; N = fixed monitor
         self.prev_monitor = None
@@ -229,8 +231,15 @@ class Recorder:
         return 1
 
     def delayed_screenshot(self, reason: str, delay: float = 0.35) -> None:
+        # A burst of actions (three Enters in a row) would otherwise queue a shot each,
+        # producing near-identical images. One pending shot captures the settled state.
+        if self.pending_shot:
+            return
+        self.pending_shot = True
+
         def run():
             time.sleep(delay)
+            self.pending_shot = False
             if not self.stop_evt.is_set():
                 try:
                     self.screenshot(reason)
@@ -300,6 +309,11 @@ class Recorder:
         if self.is_stop_combo(set(self.pressed_mods), name):
             self.stop_evt.set()
             return
+        # Holding a key down makes the OS emit a stream of repeat presses. Only the
+        # first one is a real action; ignore the rest until the key is released.
+        if name in self.held:
+            return
+        self.held.add(name)
         mods = self.pressed_mods - {"Shift"} if self.shift_in_char else set(self.pressed_mods)
         if name == "Space" and not mods:
             name = " "
@@ -318,6 +332,8 @@ class Recorder:
         name = self.key_name(key)
         if name in MODIFIERS:
             self.pressed_mods.discard(name)
+        elif name is not None:
+            self.held.discard(name)
 
     def is_stop_combo(self, mods: set[str], name: str) -> bool:
         parts = [p.strip("<>").lower() for p in self.stop_key.split("+") if p.strip()]
@@ -374,7 +390,9 @@ class Recorder:
 
     # ---- outputs -----------------------------------------------------
     def write_outputs(self) -> None:
-        events = self.events
+        # A batch of typed characters is emitted when the batch ends but timestamped
+        # when it started, so emission order is not chronological order.
+        events = sorted(self.events, key=lambda e: e.get("t") or 0)
         duration = events[-1]["t"] if events else 0
         shots = [e for e in events if e["type"] == "screenshot"]
         actions = [e for e in events if e["type"] in ("click", "type", "press", "scroll")]
