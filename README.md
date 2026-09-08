@@ -66,4 +66,4 @@ Open the cloned repo as the working folder in Claude Code and paste:
 | Verified | Platform |
 |---|---|
 | screenshot capture, per-monitor selection, click/typing/shortcut capture, Ctrl+Shift+Q stop, save_skill install/list/validation | macOS 26 (Python 3.12) |
-| everything above | Windows: **not yet tested** — see HANDOFF.md |
+| everything above | Windows Server 2022 (Python 3.13) — see HANDOFF.md for the Windows-specific fixes |

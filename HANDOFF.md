@@ -19,19 +19,36 @@ Live recording: left/right clicks with coordinates, `typed "space test works"`, 
 `Esc`, changed-region crops, monitor switch when the mouse moved, hotkey stop. `save_skill.py` install,
 duplicate rejection, `--list`, invalid-name rejection.
 
-## To verify on Windows
-1. `.\install.ps1` completes and `save_skill.py --list` prints `C:\Users\<me>\.claude\skills`.
-2. `py -3 ...\record.py --no-input --duration 5` → `trajectory.md` and one readable JPEG.
-3. `py -3 ...\record.py --duration 30` while clicking and typing in Notepad, stop with Ctrl+Shift+Q →
-   clicks, `typed "..."`, `pressed Enter`, crops, stopped by the hotkey (not by the timer).
-4. Key names use Windows conventions (Ctrl, Alt, Win). If `cmd` shows up, map it to "Win" on win32 in
-   `SPECIAL_KEY_NAMES`.
-5. `save_skill.py --open record-skill` opens Explorer (`os.startfile`).
+## Verified on Windows (2026-09-08, Windows Server 2022, Python 3.13.2)
+`install.ps1`, `--where`, `--no-input` capture (readable JPEG), live capture of clicks with
+coordinates, `pressed Ctrl+a`, `typed "space test works"` (spaces batched), `pressed Enter`,
+changed-region crops containing the typed text, stop via Ctrl+Shift+Q (18s of a 40s budget),
+`save_skill.py` install / duplicate rejection / `--force` / invalid name / `--list` / `--open`
+(opens Explorer).
 
-Known risks: DPI scaling (mss returns physical pixels; click coordinates from pynput are logical on
-some setups — if crops look offset, scale click coords by `ctypes.windll.shcore.GetScaleFactorForDevice(0)/100`);
-pynput does not see input in elevated windows; `py` launcher vs `python`; pip `--user` scripts path;
-Ctrl+Shift+Q collisions (add `--stop-key "<ctrl>+<alt>+q"` if needed).
+### Windows bugs found and fixed
+1. **Keyboard capture was completely dead.** On Windows pynput calls
+   `on_press(key, injected)` / `on_release(key, injected)`; macOS passes only `key`. The extra
+   argument raised `TypeError`, pynput killed the listener thread, and because nobody joins it the
+   failure was silent - mouse events kept coming, no keys ever appeared. All listener callbacks now
+   take `*_`, and every callback is wrapped in `Recorder.guard()` which records an `error` event
+   with a traceback instead of dying quietly.
+2. **Modifiers were never tracked.** pynput reports `Key.ctrl_l` / `shift_l` / `alt_l` on Windows;
+   only the unsuffixed macOS spellings were in `SPECIAL_KEY_NAMES`, so `Ctrl` was logged as the
+   bogus key `Ctrl_l` and never entered `pressed_mods` - which also meant the stop hotkey could
+   never match. The `_l` variants (plus `super*`, `insert`, `num_lock`, ... ) are mapped now.
+3. **Ctrl+letter recorded control codes.** With Ctrl held, Windows translates the letter to its
+   control character, so Ctrl+Q arrived as `''`. `key_name()` recovers the letter from
+   `key.vk` (falling back to `ord+96`), so shortcuts read `Ctrl+a` and the stop combo matches.
+4. `cmd` now maps to **Win** on Windows.
+5. `enable_dpi_awareness()` marks the process per-monitor-DPI-aware at startup so mss pixels and
+   pynput mouse coordinates share one coordinate space on scaled displays (this box runs at 100%,
+   where coordinates already matched exactly: a click at (1300,400) logged as (1300,400)).
+6. `save_skill.py --open <missing>` printed a WinError and exited 0; it now exits non-zero with
+   `No such skill: <path>`.
+
+Not retested on macOS after these changes - they are additive (extra key mappings, `*_` on
+callbacks, a Windows-only DPI call), but re-run the macOS live test when you pull.
 
 Fix issues directly in `skills/record-skill/`, re-run `install.ps1`, commit and push. Then on the Mac:
 `git pull && ./install.sh`.

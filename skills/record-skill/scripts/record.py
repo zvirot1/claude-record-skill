@@ -68,14 +68,49 @@ def default_out_dir() -> Path:
     return base / datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
+IS_WINDOWS = platform.system() == "Windows"
+# On Windows the "cmd"/super key is the Windows key.
+_CMD_NAME = "Win" if IS_WINDOWS else "Cmd"
+
 SPECIAL_KEY_NAMES = {
-    "cmd": "Cmd", "cmd_r": "Cmd", "ctrl": "Ctrl", "ctrl_r": "Ctrl", "alt": "Alt", "alt_r": "Alt",
-    "alt_gr": "AltGr", "shift": "Shift", "shift_r": "Shift", "enter": "Enter", "tab": "Tab",
-    "esc": "Esc", "backspace": "Backspace", "delete": "Delete", "space": "Space",
+    # pynput reports the left variants as ctrl_l / shift_l / alt_l on Windows and Linux,
+    # and as plain ctrl / shift / alt on macOS - both spellings must map to the same name.
+    "cmd": _CMD_NAME, "cmd_l": _CMD_NAME, "cmd_r": _CMD_NAME,
+    "super": _CMD_NAME, "super_l": _CMD_NAME, "super_r": _CMD_NAME, "win": _CMD_NAME,
+    "ctrl": "Ctrl", "ctrl_l": "Ctrl", "ctrl_r": "Ctrl",
+    "alt": "Alt", "alt_l": "Alt", "alt_r": "Alt", "alt_gr": "AltGr",
+    "shift": "Shift", "shift_l": "Shift", "shift_r": "Shift",
+    "enter": "Enter", "return": "Enter", "tab": "Tab",
+    "esc": "Esc", "escape": "Esc", "backspace": "Backspace", "delete": "Delete", "space": "Space",
     "up": "Up", "down": "Down", "left": "Left", "right": "Right", "home": "Home", "end": "End",
     "page_up": "PageUp", "page_down": "PageDown", "caps_lock": "CapsLock",
+    "insert": "Insert", "num_lock": "NumLock", "scroll_lock": "ScrollLock",
+    "print_screen": "PrintScreen", "pause": "Pause", "menu": "Menu",
 }
-MODIFIERS = {"Cmd", "Ctrl", "Alt", "AltGr", "Shift"}
+MODIFIERS = {"Cmd", "Win", "Ctrl", "Alt", "AltGr", "Shift"}
+
+
+def enable_dpi_awareness() -> None:
+    """Windows: make this process per-monitor DPI aware.
+
+    Without it mss grabs physical pixels while pynput reports virtualised
+    (logical) mouse coordinates on scaled displays, so clicks and crops disagree.
+    """
+    if not IS_WINDOWS:
+        return
+    import ctypes
+    try:
+        ctypes.windll.user32.SetProcessDpiAwarenessContext(-4)  # per-monitor-aware v2
+        return
+    except Exception:
+        pass
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
 
 
 class Recorder:
@@ -104,6 +139,7 @@ class Recorder:
         self.typed_buf: list[str] = []
         self.typed_t: int | None = None
         self.pressed_mods: set[str] = set()
+        self.shift_in_char = False
         self.sct = (getattr(mss, 'MSS', None) or mss.mss)()
         self.monitor = monitor  # None = follow the mouse cursor; 0 = all monitors; N = fixed monitor
         self.prev_monitor = None
@@ -203,7 +239,23 @@ class Recorder:
         threading.Thread(target=run, daemon=True).start()
 
     # ---- input listeners --------------------------------------------
-    def on_click(self, x, y, button, pressed):
+    def guard(self, fn):
+        """Wrap a listener callback: pynput kills the listener thread on an
+        unhandled exception, and nobody joins it, so the failure is otherwise
+        invisible (input silently stops being recorded)."""
+        def wrapped(*a, **kw):
+            try:
+                return fn(*a, **kw)
+            except Exception as e:
+                import traceback
+                self.emit({"type": "error", "message": f"{fn.__name__} failed: {e}",
+                           "traceback": traceback.format_exc()})
+                sys.stderr.write("[record] %s failed: %s\n" % (fn.__name__, e))
+        return wrapped
+
+    # pynput passes an extra 'injected' argument on some platforms (Windows) and not
+    # others (macOS); accept *_ so the callback never raises and kills the listener.
+    def on_click(self, x, y, button, pressed, *_):
         if not pressed:
             return
         self.flush_typing()
@@ -211,20 +263,34 @@ class Recorder:
                    "modifiers": sorted(self.pressed_mods)})
         self.delayed_screenshot("after click")
 
-    def on_scroll(self, x, y, dx, dy):
+    def on_scroll(self, x, y, dx, dy, *_):
         self.flush_typing()
         self.emit({"type": "scroll", "x": int(x), "y": int(y), "dx": int(dx), "dy": int(dy)})
 
     def key_name(self, key) -> str | None:
-        try:
-            if key.char is not None:
-                return key.char
-        except AttributeError:
-            pass
-        raw = str(key).replace("Key.", "")
+        """Return a display name for a key.
+
+        Also sets self.shift_in_char: True when the character already reflects
+        Shift (so "Shift" should not be shown separately in a combo).
+        """
+        self.shift_in_char = False
+        char = getattr(key, "char", None)
+        if char is not None:
+            # With Ctrl held, Windows and X11 translate a letter to its control
+            # code (Ctrl+Q -> ""). Recover the letter from the virtual key code.
+            if len(char) == 1 and ord(char) < 32:
+                vk = getattr(key, "vk", None)
+                if vk and 0x41 <= vk <= 0x5A:
+                    return chr(vk).lower()
+                if 0 < ord(char) <= 26:
+                    return chr(ord(char) + 96)
+                return None
+            self.shift_in_char = True
+            return char
+        raw = str(key).replace("Key.", "").strip("'")
         return SPECIAL_KEY_NAMES.get(raw, raw.capitalize())
 
-    def on_press(self, key):
+    def on_press(self, key, *_):
         name = self.key_name(key)
         if name is None:
             return
@@ -234,7 +300,7 @@ class Recorder:
         if self.is_stop_combo(set(self.pressed_mods), name):
             self.stop_evt.set()
             return
-        mods = self.pressed_mods - {"Shift"} if len(name) == 1 else set(self.pressed_mods)
+        mods = self.pressed_mods - {"Shift"} if self.shift_in_char else set(self.pressed_mods)
         if name == "Space" and not mods:
             name = " "
         if len(name) == 1 and not mods:
@@ -248,7 +314,7 @@ class Recorder:
         if name in ("Enter", "Tab", "Esc") or mods:
             self.delayed_screenshot(f"after {combo}")
 
-    def on_release(self, key):
+    def on_release(self, key, *_):
         name = self.key_name(key)
         if name in MODIFIERS:
             self.pressed_mods.discard(name)
@@ -267,10 +333,12 @@ class Recorder:
         self.screenshot("initial")
         listeners = []
         if self.capture_input:
-            listeners.append(mouse.Listener(on_click=self.on_click, on_scroll=self.on_scroll))
+            listeners.append(mouse.Listener(on_click=self.guard(self.on_click),
+                                            on_scroll=self.guard(self.on_scroll)))
             # One keyboard listener only: on macOS a second one (e.g. GlobalHotKeys) makes
             # HIToolbox abort the process ("TIS/TSM API called in two threads concurrently").
-            listeners.append(keyboard.Listener(on_press=self.on_press, on_release=self.on_release))
+            listeners.append(keyboard.Listener(on_press=self.guard(self.on_press),
+                                               on_release=self.guard(self.on_release)))
         for l in listeners:
             l.start()
         print(f"[record] recording -> {self.out}")
@@ -379,9 +447,14 @@ def main() -> None:
     args = ap.parse_args()
 
     ensure_deps(args.install_deps)
+    enable_dpi_awareness()
     out = args.out or default_out_dir()
     out.mkdir(parents=True, exist_ok=True)
 
+    if IS_WINDOWS:
+        print("[record] Windows: input from windows running as administrator is not visible unless this "
+              "recorder also runs elevated. Typing is captured globally, so avoid password fields "
+              "(or use --mask-typing).")
     if platform.system() == "Darwin":
         print("[record] macOS: the terminal app needs Screen Recording + Accessibility permission "
               "(System Settings > Privacy & Security). If input is not captured, grant Accessibility and re-run.")

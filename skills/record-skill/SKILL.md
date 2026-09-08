@@ -44,6 +44,8 @@ py -3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\record.py" --install
 Useful flags: `--mask-typing` (don't store typed text, for password-heavy flows),
 `--duration 120`, `--out <dir>`, `--max-images 50`, `--monitor 2` / `--all-monitors`
 (default: the monitor under the mouse cursor). Stop with **Ctrl+Shift+Q** or Ctrl+C.
+Modifier names in the trajectory follow the OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
+`Cmd` / `Ctrl` / `Alt` on macOS. Translate them when the skill is meant to run on another OS.
 Output lands in `~/.claude/recordings/<timestamp>/` with `trajectory.md`, `events.jsonl`,
 `shots/*.jpg`, `meta.json`. Read `trajectory.md`, then Read the referenced images that matter
 (clicks, final states). Do not read all 50 images blindly; sample around each action.

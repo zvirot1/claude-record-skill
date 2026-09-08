@@ -63,6 +63,8 @@ def validate(skill_dir: Path, name_override: str | None) -> str:
 
 
 def reveal(path: Path) -> None:
+    if not path.exists():
+        raise SystemExit(f"No such skill: {path}")
     sysname = platform.system()
     try:
         if sysname == "Darwin":
