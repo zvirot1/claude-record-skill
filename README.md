@@ -12,12 +12,16 @@ skills/record-skill/
     ├── record.py            cross-platform recorder (screenshots + mouse + keyboard)
     ├── save_skill.py        installs a drafted skill locally (user or project scope)
     ├── package_plugin.py    wraps a skill as a .plugin so Cowork can run it too
-    └── marker_view.py       shrinks a marker's screenshot for display inline in chat
+    └── marker_view.py       builds the pages that show each marker's screenshot in the pane
 install.sh                   macOS / Linux installer
 install.ps1                  Windows installer
 ```
 
-## Install
+## Install on a new machine
+
+Two things travel, and the first is needed even if you only ever use Cowork.
+
+### 1. The recorder, on the machine itself
 
 **Windows** (PowerShell):
 ```powershell
@@ -32,10 +36,30 @@ No Python? `winget install Python.Python.3.12`, then re-run.
 git clone https://github.com/zvirot1/claude-record-skill.git
 cd claude-record-skill && ./install.sh
 ```
-macOS: give your terminal app **Screen Recording** and **Accessibility** permission
-(System Settings → Privacy & Security), otherwise input is not captured.
+macOS needs a step Windows does not: give your terminal app **Screen Recording** *and*
+**Accessibility** permission (System Settings → Privacy & Security). Without them the recorder
+starts normally and produces an empty recording.
 
-Then open a new Claude Code session and type `/record-skill`.
+The installer copies `skills/*` into `~/.claude/skills` (Windows:
+`%USERPROFILE%\.claude\skills`) and pip-installs `mss`, `pynput` and `pillow`. Nothing else is
+required for Claude Code — open a new session and type `/record-skill`.
+
+### 2. For Cowork, additionally
+
+Install `cowork-plugin/dist/record-skill-local.plugin` — it comes with the clone — using **Save
+plugin**, then start a new session.
+
+This does *not* replace step 1. Cowork's default shell is a cloud container, so the plugin's own
+copy of `record.py` has no screen to capture and no path to your windows. The plugin supplies the
+instructions and the `/record-skill` command; the recorder that actually runs is the one in
+`~/.claude/skills`. **A plugin on its own records nothing.**
+
+It may already be listed for you: the local manifest holds a server-issued plugin id, which
+suggests "My Uploads" is account-level rather than per-machine (only the local copy has been
+verified). Check the list before uploading again.
+
+Nothing else needs to move. `cowork-plugin/dist/` also holds `calc-exercise`, `latest-email` and
+`save-url` — those are skills built to prove the pipeline works end to end, not parts of the tool.
 
 ## Use
 
@@ -43,7 +67,9 @@ Then open a new Claude Code session and type `/record-skill`.
    - Windows: `py -3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\record.py"`
    - macOS: `python3 ~/.claude/skills/record-skill/scripts/record.py`
    Flags: `--note "what this is for"` (states the intent), `--mask-typing` (don't store typed
-   text), `--duration 120`, `--monitor 2`, `--all-monitors`.
+   text), `--mask-titles` (keep which app, drop window titles — implied by `--mask-typing`),
+   `--duration 120`, `--monitor 2`, `--all-monitors`, `--marker-key`, `--stop-key`,
+   `--no-prompt` (ask nothing at the end; required when Claude launches it detached).
    Press **Ctrl+Shift+M** while recording to mark a moment; the recorder asks what each marker
    was after it stops, and the answer is filed at the time you pressed it. There is no audio
    capture, so these are how intent gets into a recording.
@@ -76,17 +102,19 @@ slash command in Cowork.
 
 ## Cowork
 
-Cowork's default shell runs in a cloud container with no path to the host desktop, so the recorder
-cannot run there - and Cowork does not read `~/.claude/skills` at all; it loads skills from
-plugins. `cowork-plugin/record-skill-local/` wraps the skill as a plugin for exactly that, and
-`cowork-plugin/dist/record-skill-local.plugin` is the installable file. Rebuild it with:
+Cowork does not read `~/.claude/skills` at all; it loads skills from plugins.
+`cowork-plugin/record-skill-local/` is the plugin source and
+`cowork-plugin/dist/record-skill-local.plugin` the installable build. Rebuild it after editing the
+skill, then **Save plugin** again:
 
 ```bash
 cd cowork-plugin/record-skill-local && zip -r ../dist/record-skill-local.plugin . -x "*.DS_Store"
 ```
 
-You still run `record.py` yourself on the host; only the drafted skill crosses into Cowork, and
-only if it does not depend on desktop clicks (the VM cannot click on your desktop).
+Whether a skill built this way can then *act* on the desktop depends on what the session has
+attached, so test rather than assume: a Cowork session drove `calc.exe` through its Windows-MCP
+integration after this README claimed the desktop was out of reach. The cloud container genuinely
+cannot reach it; a host surface can.
 
 ## Background
 
@@ -106,5 +134,4 @@ Open the cloned repo as the working folder in Claude Code and paste:
 |---|---|
 | screenshot capture, per-monitor selection, click/typing/shortcut capture, Ctrl+Shift+Q stop, save_skill install/list/validation | macOS 26 (Python 3.12) |
 | everything above except DPI scaling (this box runs at 100%) | Windows Server 2022 (Python 3.13) — see HANDOFF.md for the Windows-specific fixes |
-| a built skill running in Cowork - slash command, description trigger, Gmail connector, host
-desktop via MCP, and a privacy prompt before writing | 4-of-4 checklist, see HANDOFF.md |
+| a built skill running in Cowork - slash command, description trigger, Gmail connector, host desktop via MCP, and a privacy prompt before writing | 4-of-4 checklist, see HANDOFF.md |
