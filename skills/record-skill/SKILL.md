@@ -126,11 +126,24 @@ marker line. So for every marker that has no description:
    python3 ~/.claude/skills/record-skill/scripts/marker_view.py <recording> 1 --crop x,y,w,h --html
    ```
 
-   Display it inline with the visual widget, not as a file attachment - an attachment shows only
-   an icon. An inline image is embedded as base64, which passes through the context as text, so
-   crop to the region that answers the question instead of shrinking the whole frame: a dialog
-   cropped to 560px stays readable where a full frame at 560px does not. Only shrink what you
-   actually show; the stored capture stays at full size for your own reading.
+   How to show it, in order of reliability - the first two never corrupt, the third sometimes does:
+
+   - **Give the path and describe the frame in one line.** Free, exact, and the user can open the
+     file instantly. Do this always; the rest is on top.
+   - **Send the file** (a path-based send). The client may show it as a card rather than inline,
+     but it opens at full quality when clicked.
+   - **Embed it inline** as a base64 data URI in the visual widget. This is the only route that
+     puts the picture *in* the conversation, and the only one that can fail: the bytes have to be
+     reproduced character by character in the response, and a single wrong character destroys the
+     image. It has failed in practice. Keep the payload small - crop to the region that answers the
+     question rather than shrinking the whole frame - and if the result renders wrong, fall back
+     rather than retrying.
+
+   An image the *user* attaches always displays correctly, because those bytes never pass through
+   the response. That asymmetry is the whole explanation; it is not something to fix by trying
+   harder.
+
+   Only shrink what you show. The stored capture stays at full size for your own reading.
 3. Ask **what it accomplished** — not what they clicked, which the trajectory already has. Use the
    structured question tool so the user picks rather than composes: 2-4 concrete options drawn
    from the recording, multi-select when the answers are not mutually exclusive ("what varies

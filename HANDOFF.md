@@ -613,3 +613,30 @@ moments went unmarked, silently. Asked whether to change the default hotkey, the
 
 It reports rather than guesses: a near miss is not turned into a marker. The skill also tells
 Claude to ask about those timestamps anyway, since the user meant to mark something there.
+
+## Sixth correction: why the user's screenshots render and mine did not (2026-09-09)
+
+Two marker frames embedded as base64 in a visual widget came out corrupted - one failed to load,
+the other rendered as blue noise. The source was fine: both files decoded to valid 470x223 JPEGs
+with `base64.b64decode(validate=True)`. The corruption happened in the response itself.
+
+The user asked the right question: why does the screenshot *they* paste render perfectly? Because
+those bytes go from their disk to the client and never pass through the model's output. To show an
+image inline, the model has to reproduce ~4,000 characters of base64 exactly; one wrong character
+destroys the JPEG. The first single image happened to survive. The second attempt, with two, did
+not.
+
+| Who | Path | Reliability |
+|---|---|---|
+| User attaches | file to client | exact |
+| Model sends a file | path to client | exact, but often shown as a card |
+| Model embeds base64 | **bytes through the response** | can corrupt |
+
+So the instruction that had been written into both SKILL.md copies - "display it inline with the
+visual widget, never as a file attachment" - pointed at the one unreliable route of the three. It
+now ranks them: give the path and describe the frame (always, free, exact), send the file by path
+(safe), and embed inline only as an extra, kept small, with a fallback rather than a retry.
+
+This is the sixth time in this project that a failure traced back to an assumption written as
+fact. The pattern is now explicit in the skill's step 3b, and this instance is worth keeping
+because the failing assumption was one the skill itself asserted.

@@ -120,11 +120,17 @@ with no description:
 
 1. Read its image.
 2. **Show it**, cropped to the part that carries the answer. `marker_view.py` handles the
-   reduction and emits a ready widget snippet:
-   `python3 .../marker_view.py <recording> 1 --crop x,y,w,h --html`. Display it inline with the
-   visual widget, never as a file attachment - an attachment shows only an icon. The image is
-   embedded as base64 and passes through the context as text, so crop rather than shrink the whole
-   frame, and only reduce what you show; the stored capture stays full size for your own reading.
+   reduction: `python3 .../marker_view.py <recording> 1 --crop x,y,w,h --html`.
+
+   In order of reliability: always give the path and describe the frame in one line (free and
+   exact); sending the file by path is also safe though the client may render it as a card; and
+   embedding it inline as base64 in the visual widget is the only route that puts the picture in
+   the conversation and the only one that can fail - the bytes must be reproduced character by
+   character in the response, and one wrong character destroys the image. It has failed in
+   practice. Keep it small, and fall back rather than retrying.
+
+   An image the *user* attaches always renders correctly, because those bytes never pass through
+   the response. Only shrink what you show; the stored capture stays full size for your reading.
 3. Ask **what it accomplished** - not what they clicked. Use the structured question tool so the
    user picks: 2-4 options drawn from the recording, multi-select where answers are not exclusive,
    free text always available. Derive options from evidence in the trajectory, never invented ones.
