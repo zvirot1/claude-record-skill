@@ -61,6 +61,11 @@ Output lands in `~/.claude/recordings/<timestamp>/`:
 Modifier names follow the recording OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
 `Cmd` / `Ctrl` / `Alt` on macOS. Translate them if the skill will run on a different OS.
 
+**This recorder captures no audio.** Unlike the desktop app's built-in recorder there is no mic
+narration in the trajectory - only screenshots, clicks and keystrokes. The recording shows *what*
+happened, never *why*, so ask the user for the intent in the chat: what the workflow is for, which
+parts vary, what "done" looks like. If they narrated out loud, tell them it was not captured.
+
 ## 2. Read the trajectory
 
 Read `trajectory.md` first, then Read only the images that carry information: the state right
