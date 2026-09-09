@@ -41,17 +41,28 @@ Windows:
 ```powershell
 py -3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\record.py" --install-deps
 ```
-Useful flags: `--mask-typing` (don't store typed text, for password-heavy flows),
-`--duration 120`, `--out <dir>`, `--max-images 50`, `--monitor 2` / `--all-monitors`
-(default: the monitor under the mouse cursor). Stop with **Ctrl+Shift+Q** or Ctrl+C.
+Useful flags: `--note "what this is for"` (see below), `--mask-typing` (don't store typed text,
+for password-heavy flows), `--duration 120`, `--out <dir>`, `--max-images 50`,
+`--monitor 2` / `--all-monitors` (default: the monitor under the mouse cursor).
+Stop with **Ctrl+Shift+Q** or Ctrl+C.
 Modifier names in the trajectory follow the OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
 `Cmd` / `Ctrl` / `Alt` on macOS. Translate them when the skill is meant to run on another OS.
 
-**This recorder captures no audio.** Unlike the desktop app's built-in recorder, there is no mic
-narration in the trajectory — only screenshots, clicks and keystrokes. So the recording shows
-*what* happened but never *why*. Ask the user for the intent in the chat: what the workflow is
-for, which parts vary, what "done" looks like. If they narrated out loud while recording, tell
-them it was not captured and ask them to summarise it in a message.
+**This recorder captures no audio**, so the trajectory shows *what* happened but never *why*.
+Two flags carry intent instead, and both are worth suggesting before the user records:
+
+- `--note "what this workflow is for"` — one sentence, stored in the recording and shown at the
+  top of the trajectory as `Stated intent of the recording:`.
+- **Ctrl+Shift+M** during the recording stamps a marker. The recorder asks what each marker was
+  *after* stopping (the keyboard hook is global, so typing during the recording would land in the
+  trajectory), and each answer appears as a `note:` line at the moment the marker was pressed,
+  not the moment it was typed. `--marker-key` changes the hotkey; `--no-prompt` skips the
+  questions.
+
+An undescribed marker renders as `--- marker N (no description given) ---`: the user meant
+something there, so ask what it was. If they narrated out loud instead, tell them it was not
+captured and ask them to summarise it in a message. Either way still ask what varies between runs
+and what "done" looks like — no annotation covers that on its own.
 Output lands in `~/.claude/recordings/<timestamp>/` with `trajectory.md`, `events.jsonl`,
 `shots/*.jpg`, `meta.json`. Read `trajectory.md`, then Read the referenced images that matter
 (clicks, final states). Do not read all 50 images blindly; sample around each action.

@@ -188,10 +188,29 @@ Recording audio is cheap on any platform. **Transcribing it locally is the expen
 only the local-only constraint - the whole point of this project - forces that. The built-in flow
 pays no such cost: it is a cloud client whose model is server-side anyway.
 
-So do **not** reach for speech first. The cheap options give most of the value:
-1. A `--note "..."` flag (or a hotkey) to drop text annotations into the trajectory while recording.
-2. Simply describing the intent in chat after recording - a typed answer is more precise than a
-   transcript, and it is what SKILL.md already asks for.
+So speech was not reached for first. The cheap options are **implemented** as of this commit:
+1. `--note "..."` stores one sentence of intent with the recording (header + `meta.json.intent`).
+2. **Ctrl+Shift+M** stamps a marker mid-recording; the descriptions are collected after the
+   listeners are down, and each is filed at the marker's timestamp.
+3. Describing the intent in chat still works and SKILL.md still asks for it - a typed answer is
+   more precise than a transcript.
+
+The synchronisation problem and how it is solved: a note is always written *after* the moment it
+describes, so the keypress carries the timestamp and the words arrive later. That is the same
+split the typed-text batching already used (stamped at the first character, emitted when the batch
+ends), and it is why `write_outputs()` sorts by `t` - a late event with an early timestamp lands
+back in the right place. Collecting the text only after the recording stops is not just
+convenient: the keyboard hook is global, so anything typed while it is live would be recorded as
+typed text and pollute the trajectory. Verified: the Ctrl+Shift+M presses do not appear in the
+trajectory at all, and the typed strings around them stay clean.
+
+Residual imprecision, by design: human reaction lag means a marker lands ~1s after what it
+describes, and `delayed_screenshot` takes the image 0.35s after an action, so the nearest image to
+a marker may be the following one. Markers are for coarse annotation, not for pinpointing a
+200ms flash.
+
+`--no-prompt` exists because a scripted run with a console attached would otherwise block forever
+on the marker questions.
 
 Local speech-to-text (a Whisper-class model, hundreds of MB, CPU-bound, with real quality risk for
 Hebrew) is only worth it if narrating hands-free during the workflow turns out to matter more than

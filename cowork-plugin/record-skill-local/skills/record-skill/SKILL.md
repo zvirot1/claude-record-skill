@@ -61,10 +61,18 @@ Output lands in `~/.claude/recordings/<timestamp>/`:
 Modifier names follow the recording OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
 `Cmd` / `Ctrl` / `Alt` on macOS. Translate them if the skill will run on a different OS.
 
-**This recorder captures no audio.** Unlike the desktop app's built-in recorder there is no mic
-narration in the trajectory - only screenshots, clicks and keystrokes. The recording shows *what*
-happened, never *why*, so ask the user for the intent in the chat: what the workflow is for, which
-parts vary, what "done" looks like. If they narrated out loud, tell them it was not captured.
+**This recorder captures no audio**, so the trajectory shows *what* happened, never *why*.
+Two flags carry intent instead - suggest both before the user records:
+
+- `--note "what this workflow is for"` - one sentence, stored with the recording and shown at the
+  top of the trajectory as `Stated intent of the recording:`.
+- **Ctrl+Shift+M** stamps a marker while recording. The recorder asks what each marker was *after*
+  stopping (the keyboard hook is global, so typing during the recording would pollute the
+  trajectory), and each answer lands as a `note:` line at the moment the marker was pressed, not
+  the moment it was typed. `--marker-key` changes the hotkey; `--no-prompt` skips the questions.
+
+An undescribed marker renders as `--- marker N (no description given) ---` - the user meant
+something there, so ask. Still ask what varies between runs and what "done" looks like.
 
 ## 2. Read the trajectory
 

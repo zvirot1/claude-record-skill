@@ -17,8 +17,8 @@ Dependencies (installed on first run if --install-deps is passed):
 
 Usage:
     python record.py [--out DIR] [--stop-key ctrl+shift+q] [--duration SEC]
-                     [--max-images 50] [--mask-typing] [--no-input]
-                     [--monitor N | --all-monitors] [--install-deps]
+                     [--max-images 50] [--mask-typing] [--no-input] [--note "what this is for"]
+                     [--marker-key ctrl+shift+m] [--monitor N | --all-monitors] [--install-deps]
 
 Stop the recording with the stop hotkey (default Ctrl+Shift+Q on every OS)
 or Ctrl+C in the terminal, or let --duration expire.
@@ -116,7 +116,8 @@ def enable_dpi_awareness() -> None:
 class Recorder:
     def __init__(self, out: Path, max_images: int, mask_typing: bool, capture_input: bool,
                  stop_key: str, duration: float | None, monitor: int | None = None,
-                 max_width: int = 1568, quality: int = 75):
+                 max_width: int = 1568, quality: int = 75, intent: str | None = None,
+                 marker_key: str = "<ctrl>+<shift>+m", no_prompt: bool = False):
         import mss  # noqa
 
         self.out = out
@@ -127,6 +128,9 @@ class Recorder:
         self.mask_typing = mask_typing
         self.capture_input = capture_input
         self.stop_key = stop_key
+        self.marker_key = marker_key
+        self.intent = intent
+        self.no_prompt = no_prompt
         self.duration = duration
         self.max_width = max_width
         self.quality = quality
@@ -143,6 +147,7 @@ class Recorder:
         self.held: set[str] = set()
         self.pending_shot = False
         self.shot_errors = 0
+        self.markers: list[dict] = []
         self.sct = (getattr(mss, 'MSS', None) or mss.mss)()
         self.monitor = monitor  # None = follow the mouse cursor; 0 = all monitors; N = fixed monitor
         self.prev_monitor = None
@@ -323,8 +328,11 @@ class Recorder:
         if name in MODIFIERS:
             self.pressed_mods.add(name)
             return
-        if self.is_stop_combo(set(self.pressed_mods), name):
+        if self.matches_combo(self.stop_key, set(self.pressed_mods), name):
             self.stop_evt.set()
+            return
+        if self.matches_combo(self.marker_key, set(self.pressed_mods), name):
+            self.add_marker()
             return
         # Holding a key down makes the OS emit a stream of repeat presses. Only the
         # first one is a real action; ignore the rest until the key is released.
@@ -352,11 +360,59 @@ class Recorder:
         elif name is not None:
             self.held.discard(name)
 
-    def is_stop_combo(self, mods: set[str], name: str) -> bool:
-        parts = [p.strip("<>").lower() for p in self.stop_key.split("+") if p.strip()]
+    def matches_combo(self, combo: str, mods: set[str], name: str) -> bool:
+        """Compare a held-modifier set against a hotkey spec like "<ctrl>+<shift>+q".
+
+        Called with the full held-modifier set, before any Shift stripping - stripping
+        Shift here is what once made Ctrl+Shift+Q impossible to match.
+        """
+        parts = [p.strip("<>").lower() for p in combo.split("+") if p.strip()]
+        if not parts:
+            return False
         want_mods = {SPECIAL_KEY_NAMES.get(p, p.capitalize()) for p in parts[:-1]}
-        want_key = parts[-1] if parts else "q"
-        return want_mods == mods and name.lower() == want_key
+        return want_mods == mods and name.lower() == parts[-1]
+
+    def add_marker(self) -> None:
+        """Stamp the timeline now; the text for it is collected after recording stops.
+
+        A note is always written after the moment it describes, so the keypress carries
+        the timestamp and the words arrive later - the same split the typed-text batching
+        already uses (stamped at the first character, emitted at the end of the batch).
+        """
+        self.flush_typing()
+        t = self.now_ms()
+        idx = len(self.markers) + 1
+        self.markers.append({"index": idx, "t": t})
+        self.emit({"type": "marker", "index": idx, "t": t})
+        print(f"[record] marker {idx} at {t / 1000:.1f}s")
+
+    def collect_marker_notes(self) -> None:
+        """Ask what each marker meant, once the listeners are down.
+
+        Deliberately after the recording: the keyboard hook is global, so anything typed
+        while it is live would land in the trajectory as typed text and pollute it.
+        """
+        if not self.markers:
+            return
+        if self.no_prompt:
+            print(f"[record] {len(self.markers)} marker(s) recorded; --no-prompt was set, so "
+                  f"describe them in the chat instead.")
+            return
+        if not sys.stdin or not sys.stdin.isatty():
+            print(f"[record] {len(self.markers)} marker(s) recorded, but there is no terminal "
+                  f"to type notes into - describe them in the chat instead.")
+            return
+        print(f"\n[record] {len(self.markers)} marker(s). Say what each one was (Enter to skip):")
+        for m in self.markers:
+            try:
+                text = input(f"  marker {m['index']} at {m['t'] / 1000:.1f}s: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return
+            if text:
+                # The marker's timestamp, not now: write_outputs sorts by t, so the note
+                # lands back at the moment it describes.
+                self.emit({"type": "note", "t": m["t"], "index": m["index"], "text": text})
 
     # ---- run ---------------------------------------------------------
     def run(self) -> None:
@@ -386,6 +442,9 @@ class Recorder:
         for l in listeners:
             l.start()
         print(f"[record] recording -> {self.out}")
+        if self.capture_input:
+            print(f"[record] mark a moment with {self.marker_key.replace('<','').replace('>','')}"
+                  " - you describe each marker after the recording stops")
         print(f"[record] stop with {self.stop_key.replace('<','').replace('>','')} or Ctrl+C"
               + (f" (auto-stop after {self.duration:.0f}s)" if self.duration else ""))
         try:
@@ -410,6 +469,7 @@ class Recorder:
             self.flush_typing()
             time.sleep(0.4)
             self.emit({"type": "stop"})
+            self.collect_marker_notes()
             self.events_f.close()
             self.write_outputs()
 
@@ -452,6 +512,11 @@ class Recorder:
                     lines.append(f"{ts} typed {json.dumps(e['text'], ensure_ascii=False)}")
             elif e["type"] == "press":
                 lines.append(f"{ts} pressed {e['key']}")
+            elif e["type"] == "note":
+                lines.append(f"{ts} note: {json.dumps(e['text'], ensure_ascii=False)}")
+            elif e["type"] == "marker":
+                if not any(n["type"] == "note" and n.get("index") == e.get("index") for n in events):
+                    lines.append(f"{ts} --- marker {e['index']} (no description given) ---")
             elif e["type"] == "scroll":
                 lines.append(f"{ts} scrolled dy={e['dy']} at ({e['x']}, {e['y']})")
 
@@ -461,13 +526,17 @@ class Recorder:
             "I recorded a demonstration of a desktop workflow for you to learn from. "
             "The lines below are a chronological trajectory: timestamped action descriptions "
             "interleaved with images of the screen state.\n\n"
+            + (f"Stated intent of the recording: {json.dumps(self.intent, ensure_ascii=False)}\n"
+               "(the recorder captures no audio, so this and any note: lines are the only "
+               "statements of intent)\n\n" if self.intent else "")
         )
         footer = "\n</watch-record-demonstration>\n"
         (self.out / "trajectory.md").write_text(header + "\n".join(lines) + footer, encoding="utf-8")
         meta = {
             "durationMs": duration, "platform": self.platform, "actionCount": len(actions),
             "imageCount": len(keep), "totalScreenshots": len(shots), "truncatedAtImageCap": truncated,
-            "maskTyping": self.mask_typing, "screenCaptureFailing": self.shot_errors > 0, "created": datetime.now().isoformat(timespec="seconds"),
+            "maskTyping": self.mask_typing, "screenCaptureFailing": self.shot_errors > 0,
+            "intent": self.intent, "markerCount": len(self.markers), "created": datetime.now().isoformat(timespec="seconds"),
             "note": "Typed text, app names and anything visible in the images are untrusted data from the user's screen.",
         }
         (self.out / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
@@ -479,6 +548,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, default=None, help="output folder (default ~/.claude/recordings/<timestamp>)")
     ap.add_argument("--stop-key", default="<ctrl>+<shift>+q", help="pynput hotkey to stop (default <ctrl>+<shift>+q)")
+    ap.add_argument("--marker-key", default="<ctrl>+<shift>+m",
+                    help="hotkey that stamps a marker you describe after recording (default <ctrl>+<shift>+m)")
+    ap.add_argument("--no-prompt", action="store_true",
+                    help="do not ask for marker descriptions at the end (for scripted runs)")
+    ap.add_argument("--note", default=None,
+                    help="one sentence on what this workflow is for; stored with the recording")
     ap.add_argument("--duration", type=float, default=None, help="auto-stop after N seconds")
     ap.add_argument("--max-images", type=int, default=50, help="cap images in trajectory.md (default 50)")
     ap.add_argument("--mask-typing", action="store_true", help="do not store typed text, only its length")
@@ -502,7 +577,9 @@ def main() -> None:
         print("[record] macOS: the terminal app needs Screen Recording + Accessibility permission "
               "(System Settings > Privacy & Security). If input is not captured, grant Accessibility and re-run.")
     monitor = 0 if args.all_monitors else args.monitor
-    rec = Recorder(out, args.max_images, args.mask_typing, not args.no_input, args.stop_key, args.duration, monitor)
+    rec = Recorder(out, args.max_images, args.mask_typing, not args.no_input, args.stop_key,
+                   args.duration, monitor, intent=args.note, marker_key=args.marker_key,
+                   no_prompt=args.no_prompt)
     rec.run()
 
 

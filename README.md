@@ -40,7 +40,11 @@ Then open a new Claude Code session and type `/record-skill`.
 1. Record in your own terminal (needs the foreground):
    - Windows: `py -3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\record.py"`
    - macOS: `python3 ~/.claude/skills/record-skill/scripts/record.py`
-   Flags: `--mask-typing` (don't store typed text), `--duration 120`, `--monitor 2`, `--all-monitors`.
+   Flags: `--note "what this is for"` (states the intent), `--mask-typing` (don't store typed
+   text), `--duration 120`, `--monitor 2`, `--all-monitors`.
+   Press **Ctrl+Shift+M** while recording to mark a moment; the recorder asks what each marker
+   was after it stops, and the answer is filed at the time you pressed it. There is no audio
+   capture, so these are how intent gets into a recording.
    Stop with **Ctrl+Shift+Q** or Ctrl+C. Output: `~/.claude/recordings/<timestamp>/trajectory.md` + `shots/`.
 2. In Claude Code: `/record-skill` and point it at the recording folder. Claude analyses the
    outcomes (not the clicks), drafts `<name>/SKILL.md`, shows it, and saves it locally with `save_skill.py`.
