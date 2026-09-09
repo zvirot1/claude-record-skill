@@ -396,3 +396,38 @@ Three things follow:
 This is the third correction in a row about execution surfaces (local VM -> cloud container ->
 host reachable via MCP). The lesson worth carrying: infer capability from what the session reports
 doing, not from artefacts on disk, and write skills that probe rather than assume.
+
+## latest-email returned the wrong email, and why (2026-09-09)
+
+Test 1 of the checklist passed - both skills triggered from their descriptions with no slash
+command, and `calc-exercise` answered 5,461 saying "computed in Python, not in my head". But the
+user spotted that `latest-email` had not returned the newest email. It had not. The skill's core
+instruction was unsound, and measuring the mailbox showed two independent reasons.
+
+**1. A thread is not a message.** `search_threads` returns threads, each with a `messages` array,
+and the newest message can be the second one inside a lower-ranked thread. In one 25-thread sweep
+the thread at position 3 held a message 13 minutes newer than the thread at position 2, and the
+thread at position 8 held one newer than positions 4 through 7. Taking "first thread, first
+message" skips all of those.
+
+**2. The returned order is not by date.** Of those 25 threads, **6 pairs** came back with an older
+thread ranked above a newer one - including two single-message threads 164 minutes apart
+(`maxfinance` at position 24, `samsung` at 25). So "results come back newest first", which the
+skill asserted, is simply false. Whatever the ordering key is, it is not the message date.
+
+The fix: sweep `pageSize: 25` with `THREAD_VIEW_METADATA_ONLY` (cheap, no bodies), flatten every
+message of every thread, and take the largest `internalDate` - epoch milliseconds, not the
+formatted `date` string. Verified against the live mailbox: the flatten-and-max method picks the
+message that is genuinely newest, where the old method's answer was the third newest at the time.
+
+Two smaller things the same investigation surfaced, both now in the skill: pass the *message* id to
+`get_message` (for a multi-message thread it differs from the thread id), and state the winner's
+timestamp when it is only minutes old, since mail arrives between the sweep and the answer.
+
+### The pattern across these bugs
+Every failure in this session came from an assumption stated as fact - pynput's callback signature,
+the keyboard layout, "Cowork runs in a local VM", "the calculator is unreachable from Cowork", and
+now "search_threads returns newest first". The ones that survived testing were the instructions
+written as a check rather than a claim. Worth carrying into any skill drafted from a recording: if
+the skill asserts an ordering, a location or a capability, verify it against the real system once,
+and write the verification into the skill rather than the conclusion.
