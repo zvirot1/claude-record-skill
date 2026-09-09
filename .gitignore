@@ -3,5 +3,6 @@ __pycache__/
 .DS_Store
 recordings/
 
-# stray logs from test runs
+# stray logs from test runs (including rotated ones like jdbc-server.log.1)
 *.log
+*.log.*

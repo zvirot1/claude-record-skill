@@ -117,13 +117,18 @@ step 2 of the skill prescribes.
 | 3. Live recording | PASS - see below |
 | 4. `save_skill.py` matrix | PASS - install, duplicate rejection (exit 1), `--force`, invalid name (exit 1), `--list`, `--open` (Explorer), `--open <missing>` (exit 1) |
 
-Check 3 in detail, on the merged tree:
-- **Clicks with correct coordinates**: a click at (1288, 433) was recorded as exactly `(1288, 433)`.
+Check 3 in detail. One clean run on the merged tree (2026-09-09, after the desktop session came
+back at 1920x1080), all four points in a single recording:
+- **Clicks with correct coordinates**: a click at (1372, 521) was recorded as exactly `(1372, 521)`.
 - **Batched typed text including spaces**: `typed "space test works"` as one string.
 - **`pressed Enter`** and **`pressed Ctrl+a`** (the Windows control-code path).
-- **Hotkey stop**: confirmed three times, including the user's own live human run
-  (`20260908-103741`: stopped at 14.8s of a 30s budget), which also produced `pressed Win+r` with a
-  crop showing the Run dialog it opened, scroll capture, and Hebrew typed text intact as UTF-8.
+- **Hotkey stop**: stopped at 21.1s of a 60s budget - Ctrl+Shift+Q, not the timer.
+- 7 images, 0 error events, `screenCaptureFailing: false`, and the crop after Enter was read back
+  and shows the typed text in Notepad with `Ln 2, Col 1`.
+
+Also confirmed by the user's own live human run (`20260908-103741`): stopped at 14.8s of a 30s
+budget, produced `pressed Win+r` with a crop showing the Run dialog it opened, scroll capture, and
+Hebrew typed text intact as UTF-8.
 
 **DPI scaling is still unverified.** This machine reports `GetScaleFactorForDevice(0) == 100`, so
 coordinates match trivially and `enable_dpi_awareness()` never has to do any work. Exercising it
@@ -142,3 +147,8 @@ needs a HiDPI display (a scaled laptop panel).
     error event every 5 s - only the first failure and any recovery - and `meta.json` now carries
     `screenCaptureFailing`. Both copies of SKILL.md tell Claude to check that flag and offer to
     re-record instead of guessing at a workflow it has no images for.
+
+### .gitignore
+`*.log` did not cover rotated logs, so a `jdbc-server.log.1` appeared untracked but unignored -
+the same way the original `jdbc-server.log` got committed by accident. `*.log.*` is now ignored
+too. Rotated logs stay on disk; they are not this project's files.
