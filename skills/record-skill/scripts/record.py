@@ -442,26 +442,77 @@ class Recorder:
         self.emit({"type": "marker", "index": idx, "t": t})
         print(f"[record] marker {idx} at {t / 1000:.1f}s")
 
-    def collect_marker_notes(self) -> None:
-        """Ask what each marker meant, once the listeners are down.
+    def describe_action(self, ev: dict) -> str:
+        """One-line rendering of an action, to remind the user what a moment was."""
+        if ev["type"] == "click":
+            mods = ("+".join(ev["modifiers"]) + "+") if ev.get("modifiers") else ""
+            return f"{mods}{ev['button']} click at ({ev['x']}, {ev['y']})"
+        if ev["type"] == "type":
+            if ev.get("masked"):
+                return f"typed [masked, {ev['length']} chars]"
+            text = ev.get("text", "")
+            return "typed " + json.dumps(text[:40] + ("..." if len(text) > 40 else ""),
+                                         ensure_ascii=False)
+        if ev["type"] == "press":
+            return f"pressed {ev['key']}"
+        if ev["type"] == "scroll":
+            return f"scrolled dy={ev['dy']}"
+        return ev["type"]
+
+    def action_before(self, t: int) -> str | None:
+        """The last real action before a timestamp, for context in the prompt."""
+        acts = [e for e in self.events
+                if e["type"] in ("click", "type", "press", "scroll") and (e.get("t") or 0) <= t]
+        return self.describe_action(acts[-1]) if acts else None
+
+    def collect_after_recording(self) -> None:
+        """Ask for the intent, and for what each marker accomplished.
 
         Deliberately after the recording: the keyboard hook is global, so anything typed
         while it is live would land in the trajectory as typed text and pollute it.
+
+        The questions ask for **outcomes**, not mechanics. Asking "what was this?" gets
+        answers like "opened Chrome" - which the trajectory already shows. What it can
+        never show is why, and that is the only thing worth typing.
         """
-        if not self.markers:
+        wanted = self.markers or self.intent is None
+        if not wanted:
             return
         if self.no_prompt:
-            print(f"[record] {len(self.markers)} marker(s) recorded; --no-prompt was set, so "
-                  f"describe them in the chat instead.")
+            if self.markers:
+                print(f"[record] {len(self.markers)} marker(s) recorded; --no-prompt was set, so "
+                      f"say what they accomplished in the chat instead.")
             return
         if not sys.stdin or not sys.stdin.isatty():
-            print(f"[record] {len(self.markers)} marker(s) recorded, but there is no terminal "
-                  f"to type notes into - describe them in the chat instead.")
+            print(f"[record] no terminal to type into - describe the workflow and any markers "
+                  f"in the chat instead.")
             return
-        print(f"\n[record] {len(self.markers)} marker(s). Say what each one was (Enter to skip):")
-        for m in self.markers:
+
+        # The intent is asked at the end when --note was not given: at the start you did not
+        # yet know how it would go, and by now you do.
+        if self.intent is None:
+            print("\n[record] The recording captures no audio, so this is the only place the "
+                  "purpose gets recorded.")
             try:
-                text = input(f"  marker {m['index']} at {m['t'] / 1000:.1f}s: ").strip()
+                answer = input("  what did this workflow accomplish overall? ").strip()
+            except (EOFError, KeyboardInterrupt):
+                answer = ""
+                print()
+            if answer:
+                self.intent = answer
+
+        if not self.markers:
+            return
+        print(f"\n[record] {len(self.markers)} marker(s). For each one: what did it "
+              f"accomplish? (not what you clicked - that is already recorded)")
+        for m in self.markers:
+            ctx = self.action_before(m["t"])
+            label = f"  marker {m['index']} at {m['t'] / 1000:.1f}s"
+            if ctx:
+                label += f"   [just before: {ctx}]"
+            print(label)
+            try:
+                text = input("    what did this accomplish? ").strip()
             except (EOFError, KeyboardInterrupt):
                 print()
                 return
@@ -500,7 +551,7 @@ class Recorder:
         print(f"[record] recording -> {self.out}")
         if self.capture_input:
             print(f"[record] mark a moment with {self.marker_key.replace('<','').replace('>','')}"
-                  " - you describe each marker after the recording stops")
+                  " - afterwards you say what each marker accomplished")
         print(f"[record] stop with {self.stop_key.replace('<','').replace('>','')} or Ctrl+C"
               + (f" (auto-stop after {self.duration:.0f}s)" if self.duration else ""))
         try:
@@ -525,7 +576,7 @@ class Recorder:
             self.flush_typing()
             time.sleep(0.4)
             self.emit({"type": "stop"})
-            self.collect_marker_notes()
+            self.collect_after_recording()
             self.events_f.close()
             self.write_outputs()
 

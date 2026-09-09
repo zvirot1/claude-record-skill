@@ -142,8 +142,41 @@ Body: imperative steps, the exact command or tool per OS, the expected result, h
 success, and the failure modes actually seen in the recording (dialogs, waits, retries).
 Keep SKILL.md under ~300 lines; push detail into `references/`.
 
-Draft into a scratch folder, show the user the SKILL.md, and ask one question:
-save it locally, package it for Cowork, or both?
+Draft into a scratch folder **outside the recording** (e.g. `~/.claude/drafts/<name>/`) - the
+recording gets deleted for privacy, and that would take the draft with it.
+
+## 4b. Test the draft before saving it
+
+Do not skip this. Every skill that shipped broken from this workflow shipped with an unverified
+factual claim inside it, and every time the claim was wrong.
+
+**Audit the assertions.** List every statement the draft makes about how a system behaves. Four
+kinds cover nearly all of them, with a real example of each being wrong:
+
+| Kind | Example | How it failed |
+|---|---|---|
+| Ordering | "results come back newest first" | 6 of 25 rows came back out of date order |
+| Capability | "the calculator cannot be reached from Cowork" | it was reached, through a desktop integration |
+| Location | "skills load from `~/.claude/skills`" | true in Claude Code, false in Cowork |
+| Field name | a formatted `date` string instead of `internalDate` | string compare sorts wrongly |
+
+For each: verify it with one cheap call, **or** rewrite it as a check performed at runtime. Prefer
+rewriting - "sweep and take the maximum, do not rely on ordering" survives the system changing.
+
+**Then smoke-test the outcome, not the plumbing:**
+
+- Calling the tool and seeing it respond proves it is *reachable*.
+- Running what the skill instructs, computing the answer a second independent way, and comparing
+  proves it is *correct*.
+
+Only the second catches a wrong method. A skill was saved after confirming its connector answered,
+and it returned the third-newest email until the user noticed.
+
+Where a validator exists, run it on the real artifact: `claude plugin validate` on the packaged
+plugin catches frontmatter that loads with silently empty metadata.
+
+Show the user the SKILL.md **and what the test produced**, then ask one question: save it locally,
+package it for Cowork, or both?
 
 ## 5. Deliver it
 

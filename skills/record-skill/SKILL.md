@@ -126,8 +126,42 @@ Body: concise, imperative steps; the exact commands/tools per OS; expected resul
 verify success; known failure modes seen in the recording (dialogs, waits, retries).
 Keep SKILL.md under ~300 lines; push details into `reference/`.
 
-Draft first into a scratch folder (e.g. `~/.claude/recordings/<ts>/draft/<name>/`), show the
-user the SKILL.md, and ask "save locally as `/name`? user or project scope?" — one question.
+Draft into a scratch folder **outside the recording** (e.g. `~/.claude/drafts/<name>/`). Not
+inside it: the recording gets deleted for privacy, and that would take the draft with it.
+
+### 3b. Test the draft before saving it
+
+Do not skip this. Every skill that shipped broken from this workflow shipped with an unverified
+factual claim inside it, and in each case the claim was wrong.
+
+**Audit the assertions.** Read the draft and list every statement it makes about how a system
+behaves. Four kinds account for nearly all of them:
+
+| Kind | A real example that was wrong | How it failed |
+|---|---|---|
+| Ordering | "results come back newest first" | 6 of 25 rows came back out of date order |
+| Capability | "the calculator cannot be reached from a Cowork session" | it was reached, through a desktop integration |
+| Location | "skills load from `~/.claude/skills`" | true in Claude Code, false in Cowork |
+| Field name | using a formatted `date` string instead of `internalDate` | string compare would sort wrongly |
+
+For each one: verify it with a single cheap call, **or** rewrite it as a check the skill performs
+at runtime. Prefer rewriting. "Sweep and take the maximum; do not rely on ordering" survives the
+system changing; "results come back newest first" does not.
+
+**Then smoke-test the outcome, not the plumbing.** This is the step that is easy to fake:
+
+- ✗ Calling the tool and seeing it respond proves it is *reachable*.
+- ✓ Running what the skill instructs, computing the same answer a second independent way, and
+  comparing the two proves it is *correct*.
+
+Only the second catches a wrong method. A skill was saved after confirming its connector answered,
+and it returned the third-newest email for weeks-worth of queries until the user noticed.
+
+Where a validator exists, run it on the real artifact: `claude plugin validate` on a packaged
+plugin catches frontmatter that loads with silently empty metadata.
+
+Show the user the SKILL.md **and what the test produced**, then ask "save locally as `/name`? user
+or project scope?" — one question.
 
 ### 4. Save locally
 

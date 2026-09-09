@@ -490,3 +490,43 @@ never has to do any work) and the **numeric keypad on real hardware** (its scan 
 injected through the automation tool, so that path rests on faked key events plus the one recording
 that exposed the bug). Also untested: macOS after all the Windows fixes - they are additive, but a
 single live run there would close it.
+
+## Two process fixes: ask for outcomes, verify outcomes (2026-09-09)
+
+Both came out of reviewing the workflow rather than from a bug report, and they are the same fix at
+the two ends of the pipeline: mechanics were being collected on the way in and assumed on the way
+out.
+
+### The input end: the marker prompt asked the wrong question
+It used to print `Say what each one was (Enter to skip)`, and the answers it got back were
+"opened Chrome", "clicked the email", "copied the content" - all mechanics the trajectory had
+already recorded. The one thing a recording can never show, why, was never asked for.
+
+Now it asks `what did this accomplish? (not what you clicked - that is already recorded)`, and
+shows the action immediately before each marker so the moment is recognisable:
+
+    marker 1 at 4.0s   [just before: left click at (512, 1052)]
+      what did this accomplish?
+
+And when `--note` was omitted it asks for the workflow's purpose at the end, where the user
+actually knows it: `what did this workflow accomplish overall?`. `--no-prompt` still silences
+everything, and a non-interactive run still says so instead of blocking.
+
+### The output end: a test stage that checks the answer, not the plumbing
+Every skill that shipped broken from this workflow shipped with an unverified factual claim inside
+it. Step 3b now requires two things before saving:
+
+1. **An assertion audit** - list every claim the draft makes about how a system behaves, and either
+   verify it with one cheap call or rewrite it as a runtime check. The four kinds, each with a real
+   failure from this session: ordering ("newest first" - 6 of 25 rows out of order), capability
+   ("cannot reach the calculator from Cowork" - it did), location ("~/.claude/skills" - not in
+   Cowork), field name (`date` string vs `internalDate`).
+2. **A correctness smoke test** - and the distinction that matters: calling a tool and watching it
+   respond proves it is *reachable*; running what the skill instructs, computing the answer a
+   second independent way, and comparing proves it is *correct*. Only the second catches a wrong
+   method. `latest-email` was saved after the first kind of check and returned the third-newest
+   email until the user noticed.
+
+Plus: run the real validator on the real artifact where one exists, and draft **outside** the
+recording folder - the privacy advice is to delete the recording, which used to take the draft
+with it.
