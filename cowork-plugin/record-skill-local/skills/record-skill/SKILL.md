@@ -128,11 +128,12 @@ with no description:
    navigate the pane there. One frame at the pane's full width beats several stacked, and it stays
    on screen while the user answers.
 
-   Three rules, each learned by getting it wrong: let the **script** write the base64 (reproducing
-   it through a response corrupts it - frames came out blank and striped); keep the page
-   **self-contained**, since a local file renders as a static snapshot and relative image paths
-   resolve to nothing; and do **not** link the image to its file, because an absolute `file://`
-   href resolves against the project folder and lands on nothing. Print the path as text.
+   Three rules, each learned by getting it wrong: let the **script that builds the page** write
+   the base64 (reproducing it through a response corrupts it - frames came out blank and striped);
+   keep the page **self-contained**, since a local file renders as a static snapshot and relative
+   image paths resolve to nothing; and expect **no JavaScript and no working links** in that
+   snapshot - so the size toggle is CSS, the path is printed as text, and free zooming means you
+   navigate a tab to the JPEG itself.
 3. Ask **what it accomplished** - not what they clicked. Use the structured question tool so the
    user picks: 2-4 options drawn from the recording, multi-select where answers are not exclusive,
    free text always available. Derive options from evidence in the trajectory, never invented ones.

@@ -678,3 +678,30 @@ made them answerable:
 - 92.7s: the second address had been typed.
 
 Written to `notes.md` in the recording, so they survive the session.
+
+## The browser pane runs no JavaScript (2026-09-09)
+
+Asked for scroll-wheel zoom on a marker frame, which needs a script. Whether a script runs in the
+pane could not be checked from outside - the page tools refuse to act on a local file, so there is
+no way to look. Rather than guess, the page was built to **report its own state**: the hint line
+and both buttons shipped in their no-script form, and the script, if it ran, would rewrite the hint
+and enable them.
+
+It did not run. The pane showed "Zoom with Ctrl and the scroll wheel (no script is running on this
+page)" with both buttons greyed out. So a local page in the pane is a static snapshot in the strict
+sense: CSS applies, JavaScript does not execute, and links do not resolve.
+
+What that leaves, all verified:
+
+| Want | How |
+|---|---|
+| See the frame with its context | self-contained page in the pane (CSS only) |
+| Two sizes | CSS checkbox - fit-to-width, or the native 1568px with the page scrolling |
+| Free zoom | navigate a tab to the JPEG itself; the browser's image viewer handles it |
+
+The dead script was removed rather than left in place - 3 KB that cannot work here, and a page
+carrying controls that do nothing is worse than a page without them.
+
+Worth keeping as a technique: when a capability cannot be observed from outside, ship something
+whose visible state answers the question. It cost one round trip and produced a fact rather than
+another assumption - which, in this project, is the difference that has mattered every time.

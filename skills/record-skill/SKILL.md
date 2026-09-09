@@ -148,9 +148,12 @@ marker line. So for every marker that has no description:
    - **The page must be self-contained.** A local file renders in the pane as a static snapshot
      rather than being served, so relative `src="shots/009.jpg"` references resolve to nothing and
      every image comes out blank.
-   - **Do not link the image to its file.** Same reason: an absolute `file://` href gets resolved
-     against the project folder and the click lands on a path that does not exist. Print the real
-     path as text instead; the browser's own zoom works on the page as it is.
+   - **Do not link the image to its file, and do not ship a script.** Same root cause: the pane
+     renders the page as a static snapshot. An absolute `file://` href resolves against the
+     project folder and lands on nothing, and **JavaScript does not run at all** - a page that
+     reported its own state proved it. So the size toggle is a CSS checkbox (fit-to-width or the
+     native 1568px), and free zooming means opening the JPEG in a tab, which works when *you*
+     navigate a tab there.
 3. Ask **what it accomplished** — not what they clicked, which the trajectory already has. Use the
    structured question tool so the user picks rather than composes: 2-4 concrete options drawn
    from the recording, multi-select when the answers are not mutually exclusive ("what varies

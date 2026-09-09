@@ -97,14 +97,23 @@ figure { margin:0 0 26px }
 figcaption { font-size:13px; color:#6b6b66; margin:0 0 8px }
 figcaption b { color:#1a1a18; font-weight:500 }
 img { width:100%; height:auto; display:block; border:1px solid #e0ded9; border-radius:8px }
-p.hint { margin:0 0 14px; font-size:13px; color:#6b6b66 }
+p.hint { margin:0 0 12px; font-size:13px; color:#6b6b66 }
 code { font:12px ui-monospace,monospace; color:#4a4a45 }
+input.zt { position:absolute; opacity:0; width:0; height:0 }
+label.zl { display:inline-block; margin:0 0 12px; padding:5px 12px; font:13px inherit;
+           border:1px solid #d4d2cc; border-radius:6px; cursor:pointer; user-select:none }
+label.zl:hover { background:#efede8 }
+label.zl:after { content:"actual size" }
+input.zt:checked ~ label.zl:after { content:"fit to width" }
+input.zt:checked ~ figure img { width:auto; max-width:none }
 @media (prefers-color-scheme: dark) {
   body { background:#1a1a18; color:#f0efec }
   p.sub, figcaption { color:#9b9b95 }
   figcaption b { color:#f0efec }
   img { border-color:#3a3a36 }
   code { color:#b5b5ae }
+  label.zl { border-color:#4a4a45 }
+  label.zl:hover { background:#2a2a27 }
 }
 """
 
@@ -114,11 +123,18 @@ def write_one(rec: Path, file: str, label: str, t: str, note: str, name: str) ->
 
     A single image at the pane's full width is far more legible than three stacked.
 
+    No script. The pane renders a local page as a **static snapshot and does not execute
+    JavaScript** - established by shipping a page that reported its own state: the hint line
+    read "no script is running on this page" and the buttons stayed disabled. So scroll-wheel
+    zoom is not available here at all, and the toggle is a CSS checkbox: fit-to-width or the
+    native 1568px, with the page scrolling. For free zooming, open the JPEG itself in a tab -
+    the browser's image viewer handles it, and navigating a tab there works even though a
+    link inside the page does not.
+
     Do not link the image to the original file. It looks right and fails: the pane renders
     a local page as a static snapshot with no base URL, so a `file:///C:/Users/.../shots/
     009.jpg` href gets resolved against the *project* folder and the click lands on a file
-    that is not there. The page prints the real path instead, which the user can open, and
-    the browser's own zoom works on the page as it is.
+    that is not there. The page prints the real path instead.
     """
     img = rec / file
     if not img.exists():
@@ -128,9 +144,10 @@ def write_one(rec: Path, file: str, label: str, t: str, note: str, name: str) ->
     html = (f"<!doctype html><meta charset=utf-8><title>{label} - {rec.name}</title>"
             f"<style>{PAGE_CSS}</style>"
             f"<h1>{label}</h1><p class=sub>{rec.name}{stamp} &middot; {file} &middot; {note}</p>"
-            f'<p class=hint>Zoom with Ctrl and the scroll wheel. Full size at '
-            f'<code>{img}</code></p>'
-            f'<figure><img src="data:image/jpeg;base64,{data}" alt="{label}"></figure>')
+            f'<input type=checkbox class=zt id=z><label class=zl for=z></label>'
+            f'<figure><img src="data:image/jpeg;base64,{data}" alt="{label}"></figure>'
+            f'<p class=hint>The button switches between fit-to-width and 1568px. For free '
+            f'zooming, open the image itself in a tab: <code>{img}</code></p>')
     out = rec / name
     out.write_text(html, encoding="utf-8")
     sys.stderr.write("[marker_view] wrote %s - %d KB, self-contained\n"
