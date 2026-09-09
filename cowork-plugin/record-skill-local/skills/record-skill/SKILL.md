@@ -154,22 +154,24 @@ py -3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\save_skill.py" <draf
 what is installed; `--open <name>` reveals the folder. The script validates the frontmatter and
 prints the final path. New Claude Code sessions pick it up automatically as `/<name>`.
 
-**B. Cowork.** Cowork does not read `~/.claude/skills` — it loads skills from plugins. Wrap the
-drafted skill in a plugin and hand the user the `.plugin` file:
+**Frontmatter must be valid YAML, and the lenient parsers will not say otherwise.** A colon
+followed by a space inside an unquoted value reads as a nested mapping, and such a skill installs
+fine but loads with *empty metadata* — every field dropped, so it never triggers. Use a dash, or
+quote the whole value. `save_skill.py` refuses it now.
 
-```
-<plugin-name>/
-├── .claude-plugin/plugin.json     {"name": "<kebab-case>", "version": "0.1.0", "description": "..."}
-└── skills/<name>/SKILL.md
-```
+**B. Cowork.** Cowork does not read `~/.claude/skills` — it loads skills from plugins. One command
+builds the plugin from the same skill folder:
 
 ```bash
-cd <plugin-dir> && zip -r /tmp/<plugin-name>.plugin . -x "*.DS_Store"
+python3 ~/.claude/skills/record-skill/scripts/package_plugin.py <skill-folder> --out dist
 ```
 
-Write the zip to `/tmp` first, then copy it to the outputs folder — writing straight to outputs
-can fail on permissions. The `.plugin` file renders in chat as a preview with an install button.
-Name the file after the `name` in `plugin.json`.
+It writes `dist/<name>.plugin` (a zip with the manifest at its root), generates the
+`commands/<name>.md` wrapper that gives Cowork a slash command — a `skills/` folder alone does not
+— and refuses to build if the description carries XML tags, which Cowork's validator rejects.
+
+The `.plugin` file renders in chat as a preview with a **Save plugin** button. Plugins load at
+session start, so tell the user to open a new session afterwards.
 
 ## 6. Verify and hand off
 

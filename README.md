@@ -10,7 +10,8 @@ skills/record-skill/
 ├── SKILL.md                 what Claude does when you type /record-skill
 └── scripts/
     ├── record.py            cross-platform recorder (screenshots + mouse + keyboard)
-    └── save_skill.py        installs a drafted skill locally (user or project scope)
+    ├── save_skill.py        installs a drafted skill locally (user or project scope)
+    └── package_plugin.py    wraps a skill as a .plugin so Cowork can run it too
 install.sh                   macOS / Linux installer
 install.ps1                  Windows installer
 ```
@@ -57,6 +58,20 @@ message: lines like `[1.2s] full screen (...)` / `[3.4s] changed region (...)` i
 screenshots, plus typed/clicked actions, and then tells Claude to call the Cowork tools
 `propose_skills` / `save_skill`, which store the skill in the account. `record.py` produces the
 same trajectory format; `SKILL.md` forbids those two tools and writes files instead.
+
+## Running a built skill in Cowork
+
+Claude Code loads skills from `~/.claude/skills`; Cowork loads them from plugins only. Build once,
+deliver twice:
+
+```bash
+python3 ~/.claude/skills/record-skill/scripts/save_skill.py <draft> --scope user    # Claude Code
+python3 ~/.claude/skills/record-skill/scripts/package_plugin.py <skill> --out dist  # Cowork
+```
+
+The second writes `dist/<name>.plugin`; install it in Cowork with **Save plugin** and start a new
+session. It also generates a `commands/<name>.md` wrapper, because a `skills/` folder alone gets no
+slash command in Cowork.
 
 ## Cowork
 

@@ -141,6 +141,29 @@ the final path. `--scope project` installs into the current repo; `--force` over
 `--list` shows installed skills; `--open <name>` reveals the folder in Finder / Explorer.
 If Python is unavailable, create the folder and copy the files with the shell directly.
 
+**Frontmatter must be valid YAML, and the lenient parsers will not tell you.** A colon followed by
+a space inside an unquoted value (`gives the numbers: "..."`) reads as a nested mapping, and such a
+skill installs fine but loads with *empty metadata* — every field silently dropped, so it never
+triggers. Use a dash instead, or quote the whole value. `save_skill.py` refuses this now; check
+with `claude plugin validate` when it is available.
+
+### 4b. Also want it in Cowork?
+
+Cowork does not read `~/.claude/skills` — it loads skills from plugins. One command wraps the same
+folder as an installable plugin:
+
+```bash
+python3 ~/.claude/skills/record-skill/scripts/package_plugin.py <skill-folder> --out dist
+```
+
+It writes `dist/<name>.plugin` (a zip with the manifest at its root), generates the
+`commands/<name>.md` wrapper that gives Cowork a slash command — a `skills/` folder alone does not
+— and refuses to build if the description carries XML tags, which Cowork's validator rejects. Hand
+the user the file; they install it with **Save plugin** and start a new session.
+
+Say plainly which steps of the skill are host-only: Cowork's tools run in a Linux VM, so anything
+needing the user's own desktop cannot run there, while file, shell and API steps run anywhere.
+
 ### 5. Verify and hand off
 
 - `python3 .../save_skill.py --list` shows the new skill.

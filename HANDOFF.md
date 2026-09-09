@@ -258,3 +258,46 @@ The two Gmail recordings from this session contain a client's name, national ID 
 financial details in the screenshots. `~/.claude/recordings/` is a plain folder with no expiry -
 it is worth deleting a recording once the skill is drafted, and worth preferring subjects with no
 sensitive data (a calculator, a scratch file) when the goal is only to exercise the pipeline.
+
+## Building a skill that runs in both Code and Cowork (2026-09-09)
+
+`skills/record-skill/scripts/package_plugin.py` wraps any skill folder as a `.plugin`. It exists
+because the two environments load skills from different places, and hand-wrapping repeats every
+constraint we had to discover:
+
+- Cowork's validator rejects **XML tags** in a skill description.
+- A `skills/` folder alone gets **no slash command** in Cowork; only `commands/*.md` does, so the
+  script generates a thin wrapper that reads `${CLAUDE_PLUGIN_ROOT}/skills/<name>/SKILL.md`.
+- The manifest blurb is cut on a sentence or word boundary, never mid-token.
+
+Usage, and the two-destination pattern:
+
+```bash
+save_skill.py <draft> --scope user          # Claude Code reads ~/.claude/skills
+package_plugin.py <skill-folder> --out dist # Cowork reads plugins
+```
+
+### The YAML trap, found by running the official validator on generated output
+`claude plugin validate` rejected the first `calc-exercise` package:
+
+    frontmatter: YAML frontmatter failed to parse: Nested mappings are not allowed in compact
+    mappings ... At runtime this skill loads with empty metadata (all frontmatter fields silently
+    dropped).
+
+The cause was a colon followed by a space inside an unquoted description
+(`gives the numbers: "..."`), which YAML reads as a nested mapping. This matters far beyond
+packaging: such a skill **installs cleanly and then never triggers**, because every frontmatter
+field is dropped at load time. Both `save_skill.py` and `package_plugin.py` now run
+`lint_frontmatter()` and refuse it, naming the fix (use a dash, or quote the value). Checked the
+repo's own skills - `record-skill` is clean; only the freshly written one was affected.
+
+Worth keeping in mind: the regex frontmatter parsers here are lenient, and a session listed the
+broken skill with its full description as if nothing were wrong. So a skill can look installed and
+working while its metadata is gone at load time. Validate the packaged output, not just the
+manifest.
+
+### What is host-only
+Cowork runs its tools in a Linux VM. A skill step that needs the user's own desktop cannot run
+there; file, shell and API steps run anywhere. The generated plugin README says so, and
+`calc-exercise` marks its Windows-calculator section host-only while computing with `python3` or
+`py -3` depending on the environment.

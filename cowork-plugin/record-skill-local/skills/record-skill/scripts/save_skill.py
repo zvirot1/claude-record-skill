@@ -45,11 +45,47 @@ def parse_frontmatter(text: str) -> dict:
     return fm
 
 
+def lint_frontmatter(raw: str) -> list:
+    """Catch frontmatter that a strict YAML parser rejects.
+
+    The regex parsers here and in Claude Code are lenient, but `claude plugin validate`
+    is not, and a skill whose frontmatter fails to parse "loads with empty metadata
+    (all frontmatter fields silently dropped)" - it installs and then never triggers.
+    The usual cause is a colon followed by a space inside an unquoted value, which YAML
+    reads as a nested mapping.
+    """
+    problems = []
+    for line in raw.splitlines():
+        if ":" not in line or line.startswith((" ", "\t")) or line.strip().startswith("#"):
+            continue
+        key, value = line.split(":", 1)
+        value = value.strip()
+        quoted = (len(value) > 1 and value[0] == value[-1] and value[0] in "\"'")
+        if quoted:
+            continue
+        if ": " in value:
+            problems.append(
+                f"{key.strip()!r} contains a colon followed by a space, which YAML reads as a "
+                f"nested mapping. Replace it with a dash, or quote the whole value."
+            )
+        if value.startswith(("*", "&", "!", "%", "@", "`")):
+            problems.append(f"{key.strip()!r} starts with {value[0]!r}, which YAML treats specially; quote the value.")
+        if " #" in value:
+            problems.append(f"{key.strip()!r} contains ' #', which YAML reads as a comment; quote the value.")
+    return problems
+
+
 def validate(skill_dir: Path, name_override: str | None) -> str:
     md = skill_dir / "SKILL.md"
     if not md.exists():
         raise SystemExit(f"No SKILL.md in {skill_dir}")
-    fm = parse_frontmatter(md.read_text(encoding="utf-8"))
+    text = md.read_text(encoding="utf-8")
+    fm = parse_frontmatter(text)
+    raw = re.match(r"^\ufeff?---\r?\n(.*?)\r?\n---\r?\n", text, re.S).group(1)
+    bad = lint_frontmatter(raw)
+    if bad:
+        raise SystemExit("SKILL.md frontmatter is not valid YAML:\n"
+                         + "\n".join("  - " + b for b in bad))
     name = name_override or fm.get("name") or skill_dir.name
     if not NAME_RE.match(name):
         raise SystemExit(f"Invalid skill name {name!r}: use lowercase letters, digits and dashes only")
