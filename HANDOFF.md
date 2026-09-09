@@ -464,3 +464,29 @@ failed. `search_threads` returned:
 
 The old "first thread" method would have answered htzone, 4 minutes stale. Cowork answered Seeking
 Alpha - the flatten-and-take-max-internalDate method picking correctly out of order.
+
+## Cowork checklist complete: 4 of 4 (2026-09-09)
+
+| Test | Result |
+|---|---|
+| 1. Description trigger, no slash command | PASS - both skills triggered from their descriptions; `calc-exercise` answered 5,461 saying it computed in Python, not in its head |
+| 2. Operator precedence | PASS - `2+3*4` returned **14**, with the steps shown and "multiplication before addition, so 14 and not 20" stated explicitly |
+| 3. Host-only branch | PASS, and refuted the instruction - Cowork drove the Windows calculator through Windows-MCP, typed rather than clicked, and tidied up afterwards |
+| 4. Writing email content to a file | PASS - stopped before writing, offered host vs cloud with the trade-off, and judged that this particular email was a public newsletter |
+
+Two of the four improved the skills rather than merely passing them: test 3 removed an instruction
+that forbade something the agent could do, and test 4 replaced a blanket privacy rule with one that
+matches the surface to the content. Test 2 is the only one that passed exactly as written - and the
+precedence clause it produced ("14 and not 20") is what the skill asks for verbatim.
+
+### Where the project stands
+The whole pipeline is exercised end to end on Windows: record on the host, analyse for the outcome
+rather than the gestures, draft a SKILL.md, install with `save_skill.py` for Claude Code, package
+with `package_plugin.py` for Cowork, and run it in both. Two skills through it (`calc-exercise`,
+`latest-email`), nothing stored in a cloud account at any step.
+
+Still unverified anywhere: **DPI scaling** (this machine reports 100%, so `enable_dpi_awareness()`
+never has to do any work) and the **numeric keypad on real hardware** (its scan codes could not be
+injected through the automation tool, so that path rests on faked key events plus the one recording
+that exposed the bug). Also untested: macOS after all the Windows fixes - they are additive, but a
+single live run there would close it.
