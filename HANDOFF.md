@@ -365,3 +365,34 @@ machine. For `9*18` that is nothing; for a skill that touches client email, ID n
 figures it is a disclosure path, on a bank-issued machine. Both copies of SKILL.md now tell Claude
 to name the surface it used and to prefer the host surface for private data, rather than assuming
 "a local VM" as the docs previously implied.
+
+## Second correction: Cowork can reach the desktop after all (2026-09-09)
+
+Test 3 of the Cowork checklist was meant to confirm that asking for the Windows calculator from
+Cowork would be declined. It was not. The session used Windows-MCP, and reported:
+
+    Used Windows-MCP integration
+    9 * 18 = 162
+    I minimised Claude, brought calc.exe to focus, typed 9*18 and Enter (without clicking
+    buttons), closed the two extra calculator windows and restored Claude. Same number python
+    gave - this route is slower and exists only for the demonstration.
+
+Three things follow:
+
+1. **My prediction was wrong, and so was the instruction I had written into `calc-exercise`.** It
+   said the calculator route "does not work from a session whose tools run in a container or VM (a
+   Cowork session): there is no Windows desktop to open." Cowork had a host surface and correctly
+   ignored that. An instruction that forbids something the agent can actually do is worse than no
+   instruction.
+2. **The rule must be a check, not an architecture claim.** What a Cowork session can reach depends
+   on which surfaces are attached (cloud `Bash`, a device shell, Windows-MCP), not on a fixed
+   design. `calc-exercise` now says to look for a host surface and proceed if one exists, and both
+   copies of `record-skill`'s SKILL.md tell Claude to test rather than declare impossibility -
+   citing this exact incident.
+3. **The skill's own instructions did hold where they mattered**: it typed the expression instead
+   of clicking buttons, and it tidied the desktop afterwards. Tidying was not in the skill; it is
+   now.
+
+This is the third correction in a row about execution surfaces (local VM -> cloud container ->
+host reachable via MCP). The lesson worth carrying: infer capability from what the session reports
+doing, not from artefacts on disk, and write skills that probe rather than assume.

@@ -18,10 +18,14 @@ Cowork's default `Bash` runs in a **cloud container**, so **you cannot record th
 yourself** — `mss` and `pynput` have no display there and no path to the user's windows. The
 recorder always runs on the user's own machine, in their own terminal.
 
-Know which surface you are on before claiming anything is reachable: the default shell is remote,
-a separate device shell runs on the machine, and Windows-MCP reaches the host desktop. Anything
-sent through the cloud container leaves the user's machine — for private data prefer the host
-surface, and say which one you used.
+Know which surface you are on before claiming anything is reachable — and test rather than
+assume. The default shell is remote, a device shell runs on the machine, and Windows-MCP reaches
+the host desktop; which exist depends on what the user attached. Do not declare a host step
+impossible without checking: a Cowork session drove the Windows calculator through Windows-MCP
+after this skill's own wording said it could not.
+
+Anything sent through the cloud container leaves the user's machine, so prefer a host surface for
+private data and say which one you used. And leave the desktop as you found it.
 
 The host filesystem may still be reachable — Cowork has read recording folders under the user's
 home directory through its Windows-MCP integration — so try the path before asking for a paste.

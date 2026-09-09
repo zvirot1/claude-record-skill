@@ -145,8 +145,9 @@ Two ways to invoke it:
 
 ## Where it runs
 
-Cowork executes tools in a Linux VM, so any step in this skill that needs the user's own desktop
-is host-only. Steps that work on files, APIs or the shell run anywhere.
+Cowork's default shell is a cloud container, so a step needing your own desktop depends on a host
+surface being attached - a desktop-control integration or a device shell. Steps that work on files,
+APIs or the shell run anywhere.
 
 Built with `package_plugin.py` from the record-skill toolkit. The skill itself stays on the user's
 machine; nothing here is stored in a cloud account.
