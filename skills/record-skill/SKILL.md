@@ -73,6 +73,19 @@ Stop with **Ctrl+Shift+Q** or Ctrl+C.
 Modifier names in the trajectory follow the OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
 `Cmd` / `Ctrl` / `Alt` on macOS. Translate them when the skill is meant to run on another OS.
 
+A `window:` line appears whenever the foreground application changes — `window: Calculator
+(win32calc.exe)`. Read these first: they are the cheapest way to know which tool each step used,
+and they make the app boundaries explicit without opening a single image. They also catch a whole
+class of misreading — in one recording the typed text was attributed to Notepad until a
+`window: ... (py.exe)` line showed the focus had never moved, so the keystrokes had gone elsewhere
+entirely. If the actions do not line up with the application in front, trust the window line.
+
+`--mask-titles` keeps the application and drops the title, and `--mask-typing` implies it: a title
+routinely carries a name, a subject or a record number - the recording that prompted this feature
+had a client's name and national ID in a Chrome window title. `meta.json` records `maskTitles` so
+you know which you are reading. Titles are absent entirely on macOS and Linux, where the reader
+would need an extra dependency.
+
 A typed line can carry a second reading — `typed "בשךב"  (physical keys: "calc")`. The first is
 what the keyboard layout produced, the second is the keys physically pressed. When they disagree,
 the physical reading is usually what the application actually received (a non-Latin layout, or a

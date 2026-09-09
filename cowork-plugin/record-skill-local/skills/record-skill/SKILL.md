@@ -89,6 +89,16 @@ Output lands in `~/.claude/recordings/<timestamp>/`:
 Modifier names follow the recording OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
 `Cmd` / `Ctrl` / `Alt` on macOS. Translate them if the skill will run on a different OS.
 
+A `window:` line appears whenever the foreground application changes - `window: Calculator
+(win32calc.exe)`. Read these first: they say which tool each step used without opening an image,
+and they catch a class of misreading - in one recording the typed text looked like it went to
+Notepad until a `window: ... (py.exe)` line showed focus had never moved. If the actions do not
+match the application in front, trust the window line.
+
+`--mask-titles` keeps the application and drops the title; `--mask-typing` implies it, because a
+title routinely carries a name or a record number. `meta.json` records `maskTitles`. Titles are
+absent on macOS and Linux, which would need an extra dependency.
+
 A typed line can carry a second reading - `typed "בשךב"  (physical keys: "calc")`.
 The first is what the keyboard layout produced, the second is the keys physically pressed. When
 they disagree the physical reading is usually what the application actually received (a non-Latin

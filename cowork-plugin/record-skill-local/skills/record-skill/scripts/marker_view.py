@@ -14,14 +14,20 @@ small. This does that reduction - and only for the images actually being shown.
   python marker_view.py <rec> --page --at 11.7    # a moment with no marker, nearest full frame
   python marker_view.py <rec> 1                   # a data URI, for embedding elsewhere
 
-For display, open a --page in the browser pane. Prefer full frames: a marker's image
-always is one, but a frame near an unmarked moment is often a region crop, and one in
-this project's own recording is 101x94 - stretched to a pane's width it is unreadable.
---at picks the nearest full frame for you, and a too-small shot is flagged.
+  python marker_view.py <rec> --timeline           # the whole run, in order, downscaled
 
-The page is self-contained (images inlined by this script, never through a response),
-carries a CSS size toggle per frame, and ships no JavaScript - the pane renders a local
-file as a static snapshot, so scripts do not run and links do not resolve.
+For display, open a page in the browser pane. Prefer usable frames - a full screen, or a
+region crop at least 400px wide: a marker's image is always full, but a frame near an
+unmarked moment is often a crop, and one in this project's own recording is 101x94,
+unreadable when stretched. --at picks one for you and flags a hand-picked shot too small
+to bother with.
+
+Pages are self-contained: this script inlines the images as data URIs, disk to disk. Never
+pass base64 through a response - it corrupts. The pane loads the file as a `data:`
+document, so relative image paths and `file://` links never resolve, but scripts do run:
+each frame gets scroll-to-zoom, drag-to-pan and a size toggle. Write pages into a
+gitignored folder inside the project and reuse the same file names - permission is asked
+per file path, and a page there can be inspected with the page tools.
 """
 import argparse
 import base64
@@ -215,6 +221,20 @@ TIMELINE_WIDTH = 700
 TIMELINE_QUALITY = 60
 
 
+def app_at(rec: Path, t_ms: int) -> str:
+    """The application in front at a moment, from the last window event before it."""
+    app = ""
+    for line in (rec / "events.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        e = json.loads(line)
+        if e.get("type") == "window" and (e.get("t") or 0) <= t_ms:
+            app = e.get("title") or e.get("app") or ""
+            if e.get("titleMasked"):
+                app = e.get("app") or ""
+    return app
+
+
 def describe_between(rec: Path, t0: int, t1: int) -> str:
     """The actions between two frames - what produced the later one."""
     out = []
@@ -273,7 +293,8 @@ def write_timeline(rec: Path, name: str) -> Path:
     prev = 0
     for e in shots:
         t = e.get("t") or 0
-        items.append((e["file"], "%.1fs" % (t / 1000), e.get("kind", ""),
+        app = app_at(rec, t)
+        items.append((e["file"], "%.1fs" % (t / 1000), app or e.get("kind", ""),
                       describe_between(rec, prev, t)))
         prev = t
     return render_page(rec, items, "The whole run", name, reduce=True)

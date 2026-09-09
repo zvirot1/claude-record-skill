@@ -825,3 +825,42 @@ recorded `url.txt`.
 One observation raised once and left to the user: the stated purpose is a *reusable list of links*,
 but one file per link is not a list. Appending to a single `links.txt` would serve that better. The
 skill offers it and does not switch on its own, because the demonstration was deliberate.
+
+## Window events: which application each step used (2026-09-09)
+
+The last of the four improvements listed earlier, and the one that changes analysis rather than
+comfort. A `window` event is emitted **only when the foreground application changes**:
+
+    [5.5s]  window: C:\Windows\py.exe (py.exe)
+    [12.2s] typed "first app"
+    [31.2s] window: Calculator (win32calc.exe)
+    [44.4s] typed "7*6"
+
+`foreground_window()` is pure ctypes - `GetForegroundWindow`, `GetWindowTextW`,
+`QueryFullProcessImageNameW` - measured at **76 microseconds** per call, safe inside the input
+callback. Windows only; macOS would need pyobjc and Linux python-xlib, so rather than add a
+dependency the field is simply absent there.
+
+Why it matters: to learn that the Gmail workflow was "Chrome, Gmail, this account" required
+**reading screenshots**. A window line says it in text - which is faster, cheaper, and exposes
+less of the user's screen to the model. The timeline page now names the application in each
+caption instead of just the frame kind.
+
+### It caught a wrong assumption on its first run
+The test recording typed into what was supposed to be Notepad. The trajectory said
+`window: ... (py.exe)`, and the marker screenshot confirmed Notepad was empty at `Ln 1, Col 1` -
+`focus_window` had reported `isForeground: false` and the keystrokes went elsewhere. Without the
+window line the trajectory would have read as "typed 'first app'" with no hint that it landed
+somewhere else, and a skill built from it would have described a step that never happened. Both
+SKILL.md copies now say: if the actions do not match the application in front, trust the window
+line.
+
+### Titles are the risky half
+The process name is safe and carries most of the value - `chrome.exe` says which tool was used.
+Titles are the opposite: the recording that prompted this feature had a client's name and national
+ID number **in a Chrome window title**, which would move that from a JPEG into greppable text.
+So `--mask-titles` keeps the app and drops the title, `--mask-typing` implies it, and `meta.json`
+records `maskTitles`. Verified: `{"type": "window", "app": "explorer.exe", "titleMasked": true}`.
+
+Also corrected here: `marker_view.py`'s docstring still claimed the pane ships no JavaScript. It
+does run scripts - that claim was wrong and is now removed from the file as well as the notes.
