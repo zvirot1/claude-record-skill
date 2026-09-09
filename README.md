@@ -75,7 +75,7 @@ slash command in Cowork.
 
 ## Cowork
 
-Cowork runs its tools inside a Linux VM with no access to the host desktop, so the recorder
+Cowork's default shell runs in a cloud container with no path to the host desktop, so the recorder
 cannot run there - and Cowork does not read `~/.claude/skills` at all; it loads skills from
 plugins. `cowork-plugin/record-skill-local/` wraps the skill as a plugin for exactly that, and
 `cowork-plugin/dist/record-skill-local.plugin` is the installable file. Rebuild it with:

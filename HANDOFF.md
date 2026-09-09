@@ -297,7 +297,8 @@ working while its metadata is gone at load time. Validate the packaged output, n
 manifest.
 
 ### What is host-only
-Cowork runs its tools in a Linux VM. A skill step that needs the user's own desktop cannot run
+Cowork's default shell runs in a cloud container (see the correction below). A skill step that
+needs the user's own desktop cannot run
 there; file, shell and API steps run anywhere. The generated plugin README says so, and
 `calc-exercise` marks its Windows-calculator section host-only while computing with `python3` or
 `py -3` depending on the environment.
@@ -335,3 +336,32 @@ A workflow recorded on the host with `record.py`, analysed for its outcome rathe
 gestures, drafted as a SKILL.md, installed with `save_skill.py` for Claude Code and packaged with
 `package_plugin.py` for Cowork - two skills through it now, and nothing stored in a cloud account
 at any step.
+
+## Correction: where Cowork actually runs a command (2026-09-09)
+
+Earlier notes in this file said Cowork "runs its tools in a Linux VM", inferred from
+`logs/cowork_vm_node.log` downloading `rootfs.vhdx` and `vmlinuz`. Asked directly how it had
+computed `127*43`, the Cowork session answered:
+
+    command: python3 -c "print(127*43)"
+    where:   the session's cloud container (the Bash tool) - not on your computer. I did not touch
+             the host, the local VM (device_bash), or the Windows calculator.
+    output:  5461
+
+So there are **three** execution surfaces, not one:
+
+| Surface | Reaches |
+|---|---|
+| `Bash` (default) | a cloud container - nothing local |
+| `device_bash` | the local machine / VM |
+| Windows-MCP | the host desktop, PowerShell, host files |
+
+The local VM bundle is real - the log proves it downloads - but the default shell is remote. This
+also explains how the Cowork session read `C:\Users\...\recordings` earlier: through Windows-MCP,
+which it named at the time, not through Bash.
+
+**Why this matters beyond accuracy.** Anything a skill pipes through the default shell leaves the
+machine. For `9*18` that is nothing; for a skill that touches client email, ID numbers or financial
+figures it is a disclosure path, on a bank-issued machine. Both copies of SKILL.md now tell Claude
+to name the surface it used and to prefer the host surface for private data, rather than assuming
+"a local VM" as the docs previously implied.

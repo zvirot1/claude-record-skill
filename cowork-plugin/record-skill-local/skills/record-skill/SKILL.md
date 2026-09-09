@@ -14,9 +14,14 @@ account, which is exactly what this skill exists to avoid. Write files instead.
 
 ## Where you are running matters
 
-Cowork executes tools inside a Linux VM, so **you cannot record the screen yourself** — `mss`
-and `pynput` have no display there and cannot see the user's windows. The recorder always runs on
-the user's own machine, in their own terminal.
+Cowork's default `Bash` runs in a **cloud container**, so **you cannot record the screen
+yourself** — `mss` and `pynput` have no display there and no path to the user's windows. The
+recorder always runs on the user's own machine, in their own terminal.
+
+Know which surface you are on before claiming anything is reachable: the default shell is remote,
+a separate device shell runs on the machine, and Windows-MCP reaches the host desktop. Anything
+sent through the cloud container leaves the user's machine — for private data prefer the host
+surface, and say which one you used.
 
 The host filesystem may still be reachable — Cowork has read recording folders under the user's
 home directory through its Windows-MCP integration — so try the path before asking for a paste.
@@ -109,8 +114,8 @@ tool that reaches that outcome:
   **Never replay them.** If a step genuinely has no interface other than the UI, say so plainly
   and tell the user which access (a folder, a connector, a credential) would let the skill skip it.
 
-This matters more in Cowork than in Claude Code: a skill full of desktop clicks cannot run in the
-VM at all. A skill that works on files, APIs and connectors runs anywhere.
+This matters more in Cowork than in Claude Code: a skill full of desktop clicks cannot run from a
+cloud container at all. A skill that works on files, APIs and connectors runs anywhere.
 
 Confirm with the user in 3–6 bullets: goal, trigger phrases, inputs, outputs, tools. Ask about
 the variable parts — which file, which recipient, every time or once a week?

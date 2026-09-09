@@ -28,8 +28,8 @@ Two ways to invoke it:
 
 ## The one thing to know
 
-Cowork runs its tools inside a Linux VM, so **Claude cannot record your screen for you** — no
-display there, nothing for `mss` and `pynput` to see. Reading a finished recording off your disk
+Cowork's default shell runs in a cloud container, so **Claude cannot record your screen for
+you** — no display there, and no path to your windows. Reading a finished recording off your disk
 does work (Cowork reached the recording folders through its Windows-MCP integration), but the
 recording itself you run yourself, in your own terminal:
 

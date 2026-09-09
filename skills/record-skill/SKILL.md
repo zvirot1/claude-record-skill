@@ -161,8 +161,12 @@ It writes `dist/<name>.plugin` (a zip with the manifest at its root), generates 
 — and refuses to build if the description carries XML tags, which Cowork's validator rejects. Hand
 the user the file; they install it with **Save plugin** and start a new session.
 
-Say plainly which steps of the skill are host-only: Cowork's tools run in a Linux VM, so anything
-needing the user's own desktop cannot run there, while file, shell and API steps run anywhere.
+Say plainly which steps of the skill are host-only, and name the execution surface. Cowork has
+more than one: its default `Bash` runs in a **cloud container** (nothing local in reach), a
+separate device shell runs on the machine, and Windows-MCP reaches the host desktop. So a step
+that needs the user's own files or desktop cannot use the default shell, and — the part that
+matters for sensitive work — anything piped through the cloud container leaves the machine.
+Prefer the host surface for private data, and say which one the skill used.
 
 ### 5. Verify and hand off
 
