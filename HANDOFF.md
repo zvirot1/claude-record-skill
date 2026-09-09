@@ -152,3 +152,47 @@ needs a HiDPI display (a scaled laptop panel).
 `*.log` did not cover rotated logs, so a `jdbc-server.log.1` appeared untracked but unignored -
 the same way the original `jdbc-server.log` got committed by accident. `*.log.*` is now ignored
 too. Rotated logs stay on disk; they are not this project's files.
+
+## Audio / narration: not implemented, and probably not worth implementing as speech
+
+`record.py` captures **no audio at all** - the dependencies are `mss`, `pynput`, `Pillow` and
+there is no audio code path. Both copies of SKILL.md now say so outright and tell Claude to ask
+the user for the intent in chat, because the trajectory shows *what* happened and never *why*.
+
+### What was actually verified about the built-in feature
+Scanned the installed Windows package
+(`C:\Program Files\WindowsApps\Claude_1.10628.0.0_x64__pzs8sxrjxfjjc\app\resources\app.asar`):
+
+- The app **does** carry mic plumbing, but it belongs to Quick Entry **dictation**, not to the
+  recorder: `quickEntryDictationShortcut` (`capslock` / `double-tap-capslock` / `off`),
+  `quickAccess.dictation.show/stop/toggle`, `dictation.setLanguage(...)`, a microphone-permission
+  modal, and "Voice mode settings (hold-to-talk / tap-to-toggle dictation)". `setLanguage`
+  alongside `api.setCredentials` says transcription happens **service-side**; there is no local
+  ASR model in the bundle.
+- `getUserMedia` and `MediaRecorder`: **zero** hits. The `audio/webm` hits are just mime-db
+  tables, not capture code.
+- The watch-record feature is **not in this bundle at all**: `watch-record-demonstration`,
+  `cowork_watch_record`, `Record a skill` and `changed region` all return 0 hits. Consistent with
+  the Mac finding that its renderer lives in a served `ion-dist/assets/v1/shared-10-*.js`, so the
+  Windows package cannot be used to settle what the recorder captures.
+
+### Correction to an earlier claim in this file's history
+It was asserted in conversation that the built-in recorder captures mic narration. That is **not
+established**. The only evidence is SESSION-LOG.md line 40, which paraphrases the app's
+system-reminder marking narration as *untrusted data if present* - that is an instruction about
+how to treat narration, not proof that audio is recorded. It may simply cover a mic that is open
+for another reason. Treat the question as open.
+
+### Why this shapes the roadmap
+Recording audio is cheap on any platform. **Transcribing it locally is the expensive part**, and
+only the local-only constraint - the whole point of this project - forces that. The built-in flow
+pays no such cost: it is a cloud client whose model is server-side anyway.
+
+So do **not** reach for speech first. The cheap options give most of the value:
+1. A `--note "..."` flag (or a hotkey) to drop text annotations into the trajectory while recording.
+2. Simply describing the intent in chat after recording - a typed answer is more precise than a
+   transcript, and it is what SKILL.md already asks for.
+
+Local speech-to-text (a Whisper-class model, hundreds of MB, CPU-bound, with real quality risk for
+Hebrew) is only worth it if narrating hands-free during the workflow turns out to matter more than
+answering one question afterwards.
