@@ -220,9 +220,16 @@ class Recorder:
             self.typed_t = None
 
     # ---- screenshots -------------------------------------------------
-    def screenshot(self, reason: str) -> None:
+    def screenshot(self, reason: str, force_full: bool = False) -> str | None:
+        """Grab the screen. Returns the saved file, or None when nothing had changed.
+
+        force_full skips the diff-and-crop path: a marker's image is meant to show the
+        whole screen at that moment, not the few pixels that happened to change.
+        """
         from PIL import Image, ImageChops
 
+        if force_full:
+            self.prev_img = None
         mon_idx = self.pick_monitor()
         mon = self.sct.monitors[mon_idx]
         if mon_idx != self.prev_monitor:
@@ -241,7 +248,7 @@ class Recorder:
             bbox = ImageChops.difference(self.prev_img, img).convert("L").point(lambda p: 255 if p > 24 else 0).getbbox()
             if bbox is None:
                 self.prev_img = img
-                return  # nothing changed - skip
+                return None  # nothing changed - skip
             bx0, by0, bx1, by1 = bbox
             area = (bx1 - bx0) * (by1 - by0)
             if area < 0.4 * w * h:
@@ -261,6 +268,7 @@ class Recorder:
             "kind": kind, "region": region, "screen": [w, h], "monitor": mon_idx,
             "monitorOrigin": [mon["left"], mon["top"]], "reason": reason,
         })
+        return f"shots/{name}"
 
     def pick_monitor(self) -> int:
         mons = self.sct.monitors
@@ -278,24 +286,24 @@ class Recorder:
             pass
         return 1
 
-    def try_screenshot(self, reason: str) -> bool:
+    def try_screenshot(self, reason: str, force_full: bool = False):
         """Take a screenshot, reporting failure instead of raising.
 
         A screen that cannot be grabbed keeps failing every few seconds, so record the
         first failure and each recovery rather than one error event per attempt.
         """
         try:
-            self.screenshot(reason)
+            saved = self.screenshot(reason, force_full=force_full)
             if self.shot_errors:
                 self.emit({"type": "info", "message": f"screen capture recovered after "
                                                       f"{self.shot_errors} failed attempt(s)"})
                 self.shot_errors = 0
-            return True
+            return saved or True  # True: it worked, but the screen had not changed
         except Exception as e:
             self.shot_errors += 1
             if self.shot_errors == 1:
                 self.emit({"type": "error", "message": f"screenshot failed: {e}"})
-            return False
+            return None
 
     def delayed_screenshot(self, reason: str, delay: float = 0.35) -> None:
         # A burst of actions (three Enters in a row) would otherwise queue a shot each,
@@ -438,9 +446,14 @@ class Recorder:
         self.flush_typing()
         t = self.now_ms()
         idx = len(self.markers) + 1
-        self.markers.append({"index": idx, "t": t})
-        self.emit({"type": "marker", "index": idx, "t": t})
-        print(f"[record] marker {idx} at {t / 1000:.1f}s")
+        # Grab the screen now, synchronously and full-frame. The point of a marker is to
+        # be able to look at what was on screen at that moment - a delayed or cropped
+        # shot would show something else. The ~100ms cost is fine for a deliberate press.
+        shot = self.try_screenshot(f"marker {idx}", force_full=True)
+        file = shot if isinstance(shot, str) else None
+        self.markers.append({"index": idx, "t": t, "file": file})
+        self.emit({"type": "marker", "index": idx, "t": t, "file": file})
+        print(f"[record] marker {idx} at {t / 1000:.1f}s" + (f" -> {file}" if file else ""))
 
     def describe_action(self, ev: dict) -> str:
         """One-line rendering of an action, to remind the user what a moment was."""
@@ -594,6 +607,9 @@ class Recorder:
             truncated = self.max_images
             step = len(shots) / self.max_images
             keep = set(shots[int(i * step)]["screenshotIndex"] for i in range(self.max_images))
+            # A marker is a moment the user chose. Never thin its image out.
+            marked = {e["file"] for e in events if e["type"] == "marker" and e.get("file")}
+            keep |= {e["screenshotIndex"] for e in shots if e["file"] in marked}
 
         lines = []
         for e in events:
@@ -601,6 +617,8 @@ class Recorder:
             if e["type"] == "screenshot":
                 if e["screenshotIndex"] not in keep:
                     continue
+                if str(e.get("reason", "")).startswith("marker "):
+                    continue  # the marker line already shows this image
                 mon = f", monitor {e['monitor']}" if e.get("monitor") else ""
                 if e["kind"] == "full screen":
                     lines.append(f"{ts} full screen ({e['screen'][0]}x{e['screen'][1]}{mon}):")
@@ -625,8 +643,15 @@ class Recorder:
             elif e["type"] == "note":
                 lines.append(f"{ts} note: {json.dumps(e['text'], ensure_ascii=False)}")
             elif e["type"] == "marker":
-                if not any(n["type"] == "note" and n.get("index") == e.get("index") for n in events):
+                described = any(n["type"] == "note" and n.get("index") == e.get("index")
+                                for n in events)
+                if not described:
                     lines.append(f"{ts} --- marker {e['index']} (no description given) ---")
+                if e.get("file"):
+                    # The screen at the moment the user marked it - show it either way, so
+                    # whoever describes the marker can see what they were looking at.
+                    lines.append(f"![{e['file']}]({e['file']})")
+                    lines.append("")
             elif e["type"] == "scroll":
                 lines.append(f"{ts} scrolled dy={e['dy']} at ({e['x']}, {e['y']})")
 

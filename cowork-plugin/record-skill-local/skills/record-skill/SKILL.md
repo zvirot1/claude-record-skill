@@ -14,9 +14,10 @@ account, which is exactly what this skill exists to avoid. Write files instead.
 
 ## Where you are running matters
 
-Cowork's default `Bash` runs in a **cloud container**, so **you cannot record the screen
-yourself** — `mss` and `pynput` have no display there and no path to the user's windows. The
-recorder always runs on the user's own machine, in their own terminal.
+Cowork's default `Bash` runs in a **cloud container**, so the recorder cannot run *there* — `mss`
+and `pynput` have no display and no path to the user's windows. It always runs on the user's own
+machine. But you may still be able to **launch** it there yourself, if a host surface is attached;
+step 1 covers both cases.
 
 Know which surface you are on before claiming anything is reachable — and test rather than
 assume. The default shell is remote, a device shell runs on the machine, and Windows-MCP reaches
@@ -36,7 +37,7 @@ Establish which case you are in before doing anything else:
 | Case | How to tell | What to do |
 |---|---|---|
 | The user already has a recording | They name a folder, or paste a `<watch-record-demonstration>` block | Go to step 2 |
-| The user wants to record now | "record a skill", nothing recorded yet | Step 1: give them the command, wait |
+| The user wants to record now | "record a skill", nothing recorded yet | Step 1: launch it if you have a host surface, otherwise give them the command; then wait |
 | No recorder installed | The path below does not exist | Step 1 includes `--install-deps` |
 
 Try to read the recording folder directly. If the path is not reachable from where you are
@@ -45,8 +46,26 @@ attach the `shots/*.jpg` images that matter. The trajectory is plain text and pa
 
 ## 1. Get a demonstration
 
-Tell the user to run this **in their own terminal** (it needs the foreground; on macOS the
-terminal needs Screen Recording + Accessibility permission in System Settings → Privacy):
+**Try to start it yourself first.** The recorder does not need focus of its own - it hooks input
+globally and grabs the screen - so launching it detached is fine, and the user's workflow stays in
+the foreground where it belongs. That turns recording into one message instead of a copy-paste.
+
+You need a host surface: the default Cowork shell is a cloud container and cannot reach the
+machine, but a desktop-control integration or a device shell can. Test for one; do not assume
+either way.
+
+```powershell
+Start-Process -FilePath py -ArgumentList '-3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\record.py" --no-prompt --out "$env:USERPROFILE\.claude\recordings\<name>"' -WindowStyle Minimized
+```
+
+`--no-prompt` is required: a detached recorder has no terminal the user can answer questions in,
+so you collect the intent and the marker descriptions in the chat - see step 2.
+
+Then tell the user in one short message: do the workflow, **Ctrl+Shift+M** at each decision point,
+**Ctrl+Shift+Q** when finished, and say "done". Wait rather than polling the folder.
+
+**If you have no host surface**, have the user run it in their own terminal (on macOS that terminal
+needs Screen Recording + Accessibility permission in System Settings → Privacy):
 
 macOS / Linux:
 ```bash
@@ -80,18 +99,32 @@ Two flags carry intent instead - suggest both before the user records:
 
 - `--note "what this workflow is for"` - one sentence, stored with the recording and shown at the
   top of the trajectory as `Stated intent of the recording:`.
-- **Ctrl+Shift+M** stamps a marker while recording. The recorder asks what each marker was *after*
-  stopping (the keyboard hook is global, so typing during the recording would pollute the
-  trajectory), and each answer lands as a `note:` line at the moment the marker was pressed, not
-  the moment it was typed. `--marker-key` changes the hotkey; `--no-prompt` skips the questions.
+- **Ctrl+Shift+M** stamps a marker **and captures a full-frame screenshot of that exact moment**,
+  so it can be looked at later rather than recalled. Descriptions are collected after the recording
+  stops - by the recorder in its terminal, or by you in the chat when it ran detached with
+  `--no-prompt`. Either way each answer lands as a `note:` line at the moment the marker was
+  pressed, not the moment it was typed. `--marker-key` changes the hotkey.
 
-An undescribed marker renders as `--- marker N (no description given) ---` - the user meant
-something there, so ask. Still ask what varies between runs and what "done" looks like.
+An undescribed marker renders as `--- marker N (no description given) ---` followed by its image -
+the user meant something there, so ask; step 2 says how. Still ask what varies between runs and
+what "done" looks like.
 
 ## 2. Read the trajectory
 
 Read `trajectory.md` first, then Read only the images that carry information: the state right
 after each click, and each final state. Do not read all 50 images blindly.
+
+**Walk the markers with the user, in the chat, with the pictures.** Every `Ctrl+Shift+M` press
+captured a full-frame screenshot of that moment, referenced on the marker line. For each marker
+with no description: Read its image, say in one line what is on screen so the user recognises the
+moment without having to remember it, and ask **what it accomplished** - not what they clicked,
+which the trajectory already has. Ask about all of them in one numbered message rather than one
+question per turn.
+
+Write the answers into `notes.md` in the recording folder as
+`marker N (t=12.3s): <what it accomplished>`, so they survive into another session and travel with
+the recording. If the recording has no stated intent either - no `--note`, and a detached recorder
+could not ask - ask that too: what did this workflow accomplish overall?
 
 Check the recording is usable before analysing it. `"screenCaptureFailing": true` in `meta.json`
 means the screen could not be grabbed (locked session, disconnected RDP, missing macOS Screen

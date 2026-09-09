@@ -530,3 +530,45 @@ it. Step 3b now requires two things before saving:
 Plus: run the real validator on the real artifact where one exists, and draft **outside** the
 recording folder - the privacy advice is to delete the recording, which used to take the draft
 with it.
+
+## Starting the recording from the chat, and walking markers with pictures (2026-09-09)
+
+Two requests, and the second turned out to be impossible until the recorder changed.
+
+### A marker now captures its own screenshot
+`Ctrl+Shift+M` used to record **only a timestamp** - no image at all - so "show me the screen at
+the moment I marked" could not be answered. `add_marker()` now grabs the screen synchronously with
+`force_full=True`:
+
+- **synchronously**, because the point is the state at that instant; a delayed shot shows something
+  else. It costs ~100ms on the listener thread, which is fine for a deliberate keypress.
+- **full frame**, not the usual diff-and-crop, because the value is the context around the moment.
+- the marker event carries the file, the trajectory renders it under the marker line, and marker
+  images are **exempt from the image cap** - a moment the user chose is never thinned out.
+- the marker's own screenshot event is skipped when rendering, or the image appeared twice.
+
+`screenshot()` now returns the file it wrote (or None when nothing had changed) so the marker can
+reference it; `try_screenshot()` passes the flag through and hands the name back.
+
+### Claude can launch the recorder itself
+The skill had always said "tell the user to run this in their own terminal", justified by the
+recorder needing the foreground. That was wrong in an important way: **the recorder needs no focus
+of its own** - it hooks input globally and grabs the screen. What needs the foreground is the
+user's workflow. Launching it detached is fine, and this session had in fact been doing exactly
+that for its own tests all along.
+
+So step 1 now leads with launching it, `Start-Process ... -WindowStyle Minimized` (or `nohup` on
+macOS and Linux), with `--no-prompt` because a detached process has no terminal for its questions.
+In Cowork this depends on a host surface being attached - the default cloud shell cannot reach the
+machine, a desktop integration can - and the skill says to test rather than assume, per the earlier
+correction.
+
+### The questions move into the chat
+With `--no-prompt` the recorder asks nothing, so step 2 now opens by walking the markers in the
+conversation: read each marker's image, say in one line what is on screen so the user recognises
+the moment without having to remember it, and ask **what it accomplished**. All markers in one
+numbered message, and the answers written to `notes.md` in the recording folder so they survive
+into another session.
+
+That closes the loop on the earlier prompt fix: the question is asked about outcomes, and now it is
+asked next to a picture of the moment, which is what makes an outcome answerable.

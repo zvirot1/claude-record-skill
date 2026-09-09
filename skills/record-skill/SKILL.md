@@ -31,8 +31,33 @@ use `~`, `$HOME` / `$env:USERPROFILE`, or Python `Path.home()`.
 
 Pick whichever source the user has. Ask only if none is present.
 
-**A. Record now (bundled recorder).** Tell the user to run, in their own terminal (it needs
-the foreground, and on macOS the terminal must have Screen Recording + Accessibility permission):
+**A. Start the recording yourself.** Preferred when you have a host surface, because it turns
+recording into one message instead of a copy-paste. The recorder does *not* need focus of its own
+— it hooks input globally and grabs the screen — so launching it detached is fine, and the user's
+workflow stays in the foreground where it belongs.
+
+First establish the surface. A local shell (Claude Code on the user's machine) can launch it
+directly; in Cowork the default shell is a cloud container and cannot, but a desktop-control
+integration or device shell can. If you have none, fall through to option B.
+
+Windows:
+```powershell
+Start-Process -FilePath py -ArgumentList '-3 "$env:USERPROFILE\.claude\skills\record-skill\scripts\record.py" --no-prompt --out "$env:USERPROFILE\.claude\recordings\<name>"' -WindowStyle Minimized
+```
+macOS / Linux:
+```bash
+nohup python3 ~/.claude/skills/record-skill/scripts/record.py --no-prompt \
+  --out ~/.claude/recordings/<name> >/dev/null 2>&1 &
+```
+
+`--no-prompt` is required here: a detached process has no terminal the user can answer questions
+in. You collect the intent and the marker descriptions in the chat instead — see step 2.
+
+Then tell the user, in one short message: do the workflow now, press **Ctrl+Shift+M** at each
+decision point, **Ctrl+Shift+Q** when finished, and say "done". Wait — do not poll the folder.
+
+**B. Have the user run it in their own terminal.** Use this when you have no host surface, or when
+they prefer it (on macOS the terminal needs Screen Recording + Accessibility permission):
 
 ```bash
 python3 ~/.claude/skills/record-skill/scripts/record.py --install-deps
@@ -58,16 +83,16 @@ Two flags carry intent instead, and both are worth suggesting before the user re
 
 - `--note "what this workflow is for"` — one sentence, stored in the recording and shown at the
   top of the trajectory as `Stated intent of the recording:`.
-- **Ctrl+Shift+M** during the recording stamps a marker. The recorder asks what each marker was
-  *after* stopping (the keyboard hook is global, so typing during the recording would land in the
-  trajectory), and each answer appears as a `note:` line at the moment the marker was pressed,
-  not the moment it was typed. `--marker-key` changes the hotkey; `--no-prompt` skips the
-  questions.
+- **Ctrl+Shift+M** during the recording stamps a marker **and captures a full-frame screenshot of
+  that exact moment**, so the moment can be looked at later rather than recalled. Descriptions are
+  collected after the recording stops — by the recorder in its own terminal, or by you in the chat
+  when it ran detached with `--no-prompt`. Either way each answer becomes a `note:` line at the
+  moment the marker was pressed, not the moment it was typed. `--marker-key` changes the hotkey.
 
-An undescribed marker renders as `--- marker N (no description given) ---`: the user meant
-something there, so ask what it was. If they narrated out loud instead, tell them it was not
-captured and ask them to summarise it in a message. Either way still ask what varies between runs
-and what "done" looks like — no annotation covers that on its own.
+An undescribed marker renders as `--- marker N (no description given) ---` followed by its image:
+the user meant something there, so ask — step 2 says how. If they narrated out loud instead, tell
+them it was not captured and ask them to summarise it in a message. Either way still ask what
+varies between runs and what "done" looks like — no annotation covers that on its own.
 Output lands in `~/.claude/recordings/<timestamp>/` with `trajectory.md`, `events.jsonl`,
 `shots/*.jpg`, `meta.json`. Read `trajectory.md`, then Read the referenced images that matter
 (clicks, final states). Do not read all 50 images blindly; sample around each action.
@@ -79,14 +104,31 @@ Recording permission) and the trajectory has actions but no images. `{"type": "e
 user says they pressed the stop hotkey all mean the same thing: say so and offer to re-record.
 Never fill the gap by guessing what the workflow was.
 
-**B. Pasted desktop-app recording.** The desktop app's recorder produces a
+**C. Pasted desktop-app recording.** The desktop app's recorder produces a
 `<watch-record-demonstration durationMs steps images platform>` block: lines like
 `[1.2s] full screen (...)` / `[3.4s] changed region (...)` followed by images, plus
-typed/clicked actions. Treat it exactly like source A.
+typed/clicked actions. Treat it exactly like a recording from A or B.
 
-**C. Screenshots / a video / a written description.** Ask for the sequence, then proceed.
+**D. Screenshots / a video / a written description.** Ask for the sequence, then proceed.
 
 ### 2. Analyze the trajectory (outcomes, not gestures)
+
+**First, walk the markers with the user — in the chat, with the pictures.** Each
+`Ctrl+Shift+M` press captured a full-frame screenshot of that exact moment, referenced on the
+marker line. So for every marker that has no description:
+
+1. Read its image.
+2. Say what is on screen at that point, in one line, so the user recognises the moment without
+   having to remember it.
+3. Ask what it accomplished — not what they clicked, which the trajectory already has.
+
+Ask about all of them in one message, numbered, rather than one question per turn. Then write the
+answers into `notes.md` in the recording folder, as `marker N (t=12.3s): <what it accomplished>`,
+so they survive into another session and travel with the recording.
+
+If the recording carries no stated intent either (no `--note`, and the recorder could not ask
+because it ran detached), ask that too: what did this workflow accomplish overall?
+
 
 For every demonstrated step, name the **outcome** (file changed, message sent, data fetched,
 setting flipped, page reached), not the click that produced it. Then pick the fastest, most
