@@ -108,7 +108,10 @@ def short_description(description: str, limit: int = 240) -> str:
 
 
 def command_stub(skill_name: str, description: str) -> str:
-    short = description.split(".")[0].strip()
+    # Split on a sentence end, not on any period: ".txt", ".md" and "e.g." all contain
+    # one, and splitting on "." truncated a real description to "Save a web address to
+    # a named" - cut inside ".txt file".
+    short = re.split(r"\.(?:\s|$)", description)[0].strip()
     if len(short) > 59:
         short = short[:56].rstrip() + "..."
     return f"""---
