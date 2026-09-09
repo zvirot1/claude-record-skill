@@ -794,3 +794,34 @@ megabytes in one data: document.
 
 A page inside the project folder can also be screenshotted with the page tools, so these pages are
 now verified directly rather than by asking the user whether they rendered.
+
+## save-url: the third skill through the pipeline (2026-09-09)
+
+Built from the 102-second Notepad recording, installed for Claude Code and packaged for Cowork.
+What the recording demonstrated - Win+R, `notepad`, typing, Ctrl+S, navigating the Save As dialog,
+typing a name, Save, twice over - collapses to one file write. The skill says so outright, because
+the temptation to reproduce the demonstration is the failure mode this whole project exists to
+avoid.
+
+The user's answers fixed what varies and what does not: **the address and the file name vary**;
+the folder (Documents), the extension and UTF-8 are fixed. So the skill asks for a name when none
+is given rather than deriving one from the domain - `url.txt` and `urlgmail.txt` were named by
+hand, which means the name carries the user's own meaning.
+
+Three details came from measuring the artifact instead of assuming it, and each would have been
+wrong by default:
+
+- `Out-File -Encoding utf8` adds a BOM on Windows PowerShell 5.1; the user's files have none. The
+  skill uses `[IO.File]::WriteAllText` with `UTF8Encoding $false`.
+- **No trailing newline** - the real files are 14 and 13 bytes, exactly the address.
+- The Documents path comes from `[Environment]::GetFolderPath('MyDocuments')`, not from
+  `%USERPROFILE%\Documents`. They matched on this machine, which is not a guarantee anywhere with
+  folder redirection.
+
+Step 3b ran properly: the lint passed, and the smoke test compared the skill's own command against
+an independently computed answer - 15 bytes, no BOM, no trailing newline, the same shape as the
+recorded `url.txt`.
+
+One observation raised once and left to the user: the stated purpose is a *reusable list of links*,
+but one file per link is not a list. Appending to a single `links.txt` would serve that better. The
+skill offers it and does not switch on its own, because the demonstration was deliberate.
