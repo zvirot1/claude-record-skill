@@ -431,3 +431,36 @@ now "search_threads returns newest first". The ones that survived testing were t
 written as a check rather than a claim. Worth carrying into any skill drafted from a recording: if
 the skill asserts an ordering, a location or a capability, verify it against the real system once,
 and write the verification into the skill rather than the conclusion.
+
+## Test 4 passed, and taught the skill something (2026-09-09)
+
+Asked to save the newest email to a file, the Cowork session **stopped before writing** and offered
+three destinations:
+
+1. the machine itself (`Desktop`), written through Windows-MCP - "the content does not pass through
+   the cloud";
+2. a file to download from the chat, built in the cloud environment - adding that *this particular*
+   email is a public Seeking Alpha newsletter with no personal data, so that path would not expose
+   client information;
+3. another path, on request.
+
+That is the behaviour the skill asked for, plus a judgement it did not: it assessed the sensitivity
+of **this** email rather than applying a blanket rule. The skill said "for this content use the host
+surface, or do not write it at all", which is too absolute - a public newsletter through the cloud
+path costs nothing. It now says to match the surface to what the email actually contains, with the
+two cases spelled out, and to name the destination before writing rather than after.
+
+Second time a Cowork run has improved the skill by doing something better than instructed (the
+first was tidying the desktop after using the calculator). Worth noting as a pattern: watch what a
+good run does beyond the instructions, and fold it back in.
+
+### The ordering fix verified live
+The same test also confirmed the `latest-email` fix, on a query where the old method would have
+failed. `search_threads` returned:
+
+    position 1: htzone        10:01:16
+    position 2: seekingalpha  10:05:32   <- actually the newest
+    position 3: payngo        10:01:39
+
+The old "first thread" method would have answered htzone, 4 minutes stale. Cowork answered Seeking
+Alpha - the flatten-and-take-max-internalDate method picking correctly out of order.
