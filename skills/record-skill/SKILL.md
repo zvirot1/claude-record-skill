@@ -117,14 +117,34 @@ typed/clicked actions. Treat it exactly like a recording from A or B.
 `Ctrl+Shift+M` press captured a full-frame screenshot of that exact moment, referenced on the
 marker line. So for every marker that has no description:
 
-1. Read its image.
-2. Say what is on screen at that point, in one line, so the user recognises the moment without
-   having to remember it.
-3. Ask what it accomplished — not what they clicked, which the trajectory already has.
+1. Read its image, so you know what the moment was.
+2. **Show it to the user**, cropped to the part that carries the answer. `marker_view.py` does the
+   reduction: it lists the markers with their sizes, and emits a ready widget snippet.
 
-Ask about all of them in one message, numbered, rather than one question per turn. Then write the
-answers into `notes.md` in the recording folder, as `marker N (t=12.3s): <what it accomplished>`,
-so they survive into another session and travel with the recording.
+   ```bash
+   python3 ~/.claude/skills/record-skill/scripts/marker_view.py <recording>            # list
+   python3 ~/.claude/skills/record-skill/scripts/marker_view.py <recording> 1 --crop x,y,w,h --html
+   ```
+
+   Display it inline with the visual widget, not as a file attachment - an attachment shows only
+   an icon. An inline image is embedded as base64, which passes through the context as text, so
+   crop to the region that answers the question instead of shrinking the whole frame: a dialog
+   cropped to 560px stays readable where a full frame at 560px does not. Only shrink what you
+   actually show; the stored capture stays at full size for your own reading.
+3. Ask **what it accomplished** — not what they clicked, which the trajectory already has. Use the
+   structured question tool so the user picks rather than composes: 2-4 concrete options drawn
+   from the recording, multi-select when the answers are not mutually exclusive ("what varies
+   between runs?" usually takes several), and free text is always available for anything you did
+   not anticipate. Derive the options from evidence in the trajectory - the actual URLs typed, the
+   actual filenames - never invented ones.
+
+Ask one question at a time rather than listing them all as prose. Then write the answers into
+`notes.md` in the recording folder, as `marker N (t=12.3s): <what it accomplished>`, so they
+survive into another session and travel with the recording.
+
+If the recorder printed a note that a near-miss hotkey was pressed (`Ctrl+Shift+P` when the marker
+key is `Ctrl+Shift+M`), those moments have no marker and no image. Ask about them from their
+timestamps - the user meant to mark something there.
 
 If the recording carries no stated intent either (no `--note`, and the recorder could not ask
 because it ran detached), ask that too: what did this workflow accomplish overall?

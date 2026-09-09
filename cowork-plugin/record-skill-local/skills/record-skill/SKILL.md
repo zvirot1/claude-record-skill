@@ -116,10 +116,22 @@ after each click, and each final state. Do not read all 50 images blindly.
 
 **Walk the markers with the user, in the chat, with the pictures.** Every `Ctrl+Shift+M` press
 captured a full-frame screenshot of that moment, referenced on the marker line. For each marker
-with no description: Read its image, say in one line what is on screen so the user recognises the
-moment without having to remember it, and ask **what it accomplished** - not what they clicked,
-which the trajectory already has. Ask about all of them in one numbered message rather than one
-question per turn.
+with no description:
+
+1. Read its image.
+2. **Show it**, cropped to the part that carries the answer. `marker_view.py` handles the
+   reduction and emits a ready widget snippet:
+   `python3 .../marker_view.py <recording> 1 --crop x,y,w,h --html`. Display it inline with the
+   visual widget, never as a file attachment - an attachment shows only an icon. The image is
+   embedded as base64 and passes through the context as text, so crop rather than shrink the whole
+   frame, and only reduce what you show; the stored capture stays full size for your own reading.
+3. Ask **what it accomplished** - not what they clicked. Use the structured question tool so the
+   user picks: 2-4 options drawn from the recording, multi-select where answers are not exclusive,
+   free text always available. Derive options from evidence in the trajectory, never invented ones.
+
+Ask one question at a time rather than listing them as prose. If the recorder noted a near-miss
+hotkey (`Ctrl+Shift+P` when the marker key is `Ctrl+Shift+M`), those moments have no marker and no
+image - ask about them from their timestamps anyway.
 
 Write the answers into `notes.md` in the recording folder as
 `marker N (t=12.3s): <what it accomplished>`, so they survive into another session and travel with

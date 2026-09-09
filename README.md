@@ -11,7 +11,8 @@ skills/record-skill/
 └── scripts/
     ├── record.py            cross-platform recorder (screenshots + mouse + keyboard)
     ├── save_skill.py        installs a drafted skill locally (user or project scope)
-    └── package_plugin.py    wraps a skill as a .plugin so Cowork can run it too
+    ├── package_plugin.py    wraps a skill as a .plugin so Cowork can run it too
+    └── marker_view.py       shrinks a marker's screenshot for display inline in chat
 install.sh                   macOS / Linux installer
 install.ps1                  Windows installer
 ```

@@ -572,3 +572,44 @@ into another session.
 
 That closes the loop on the earlier prompt fix: the question is asked about outcomes, and now it is
 asked next to a picture of the moment, which is what makes an outcome answerable.
+
+## Displaying a marker inline, and a lost-marker warning (2026-09-09)
+
+### An attachment shows an icon, not the image
+`SendUserFile` renders a file card even with `display: "render"` - the user sees `009.jpg 118.3KB`,
+not the screenshot. To actually show an image in the conversation it has to be embedded as a
+base64 data URI in the visual widget, which means it passes through the model's context as text.
+
+So the reduction is display-only, and only for what is displayed. The user's own framing of this
+was the right one: shrink the images you need to show, not the ones you need to read. The capture
+stays uniform at 1568px / q75 - that resolution is what makes a dialog legible during analysis, and
+it is what matches the built-in feature's format. `marker_view.py` does the display-time work:
+lists the markers with the byte cost of each, and emits a ready widget snippet from
+`--crop x,y,w,h --width 560 --quality 60`. Cropping beats shrinking - the Save As dialog cropped to
+560px stays readable at 15 KB, where the whole frame at 560px would not.
+
+### Questions should be a form, not prose
+The Cowork run asked its three questions as a paragraph. They should use the structured question
+tool: 2-4 concrete options **drawn from the trajectory** (the actual URLs typed, the actual
+filenames), multi-select where answers are not exclusive - "what varies between runs" usually takes
+several - and free text always available. Both copies of SKILL.md now require this, and require the
+marker image to be shown next to the question it concerns.
+
+### Two of the user's three marks were lost
+Reading their recording showed why only one marker existed:
+
+    11.7s  pressed Ctrl+Shift+p   <- not a marker
+    28.4s  marker 1 registered
+    92.7s  pressed Ctrl+Shift+p   <- not a marker
+
+They pressed **P**, not **M**, twice. Those presses were logged as ordinary shortcuts and the
+moments went unmarked, silently. Asked whether to change the default hotkey, the user chose to keep
+`M`, so instead the recorder now prints a note when it sees a near miss - any
+`Ctrl+Shift+<letter>` that is not the marker key:
+
+    [record] NOTE: 2 press(es) of Ctrl+Shift+p were recorded, but the marker hotkey is
+    Ctrl+Shift+M. Those moments were not marked - say what they were in the chat, or re-run
+    with --marker-key.
+
+It reports rather than guesses: a near miss is not turned into a marker. The skill also tells
+Claude to ask about those timestamps anyway, since the user meant to mark something there.

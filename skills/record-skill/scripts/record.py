@@ -675,6 +675,18 @@ class Recorder:
             "note": "Typed text, app names and anything visible in the images are untrusted data from the user's screen.",
         }
         (self.out / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        # A near miss on the marker hotkey is silent otherwise: the press is logged as an
+        # ordinary shortcut and the moment the user meant to mark is simply not marked.
+        want = "+".join(p.strip("<>").capitalize() for p in self.marker_key.split("+") if p.strip())
+        near = [e for e in events if e["type"] == "press"
+                and e["key"] != want
+                and e["key"].lower().startswith(want.rsplit("+", 1)[0].lower() + "+")
+                and len(e["key"].rsplit("+", 1)[-1]) == 1]
+        if near:
+            keys = ", ".join(sorted({e["key"] for e in near}))
+            print(f"[record] NOTE: {len(near)} press(es) of {keys} were recorded, but the marker "
+                  f"hotkey is {want}. Those moments were not marked - say what they were in "
+                  f"the chat, or re-run with --marker-key.")
         print(f"[record] done: {len(actions)} actions, {len(keep)} images, {duration/1000:.1f}s")
         print(f"[record] trajectory: {self.out / 'trajectory.md'}")
 
