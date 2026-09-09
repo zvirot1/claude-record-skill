@@ -67,8 +67,8 @@ def load_shots(rec: Path) -> list:
     return out
 
 
-def nearest_full(rec: Path, t_ms: int):
-    """The full-screen frame closest in time to a moment.
+def nearest_full(rec: Path, t_ms: int, side: str = None):
+    """The full-screen frame closest in time to a moment, optionally on one side of it.
 
     Region crops are the wrong thing to display: their size is unpredictable - one in
     this project's own recording is 101x94 - and stretching that to a pane's width turns
@@ -76,6 +76,10 @@ def nearest_full(rec: Path, t_ms: int):
     moment often is not, so pick deliberately rather than by index.
     """
     full = [e for e in load_shots(rec) if e.get("kind") == "full screen"]
+    if side == "before":
+        full = [e for e in full if (e.get("t") or 0) < t_ms]
+    elif side == "after":
+        full = [e for e in full if (e.get("t") or 0) > t_ms]
     if not full:
         return None
     return min(full, key=lambda e: abs((e.get("t") or 0) - t_ms))
@@ -153,95 +157,123 @@ input.zt:checked ~ figure img { max-width:none }
 """
 
 
-def write_one(rec: Path, file: str, label: str, t: str, note: str, name: str) -> Path:
-    """One frame per page, so the question being asked has the pane to itself.
-
-    A single image at the pane's full width is far more legible than three stacked.
-
-    No script. The pane renders a local page as a **static snapshot and does not execute
-    JavaScript** - established by shipping a page that reported its own state: the hint line
-    read "no script is running on this page" and the buttons stayed disabled. So scroll-wheel
-    zoom is not available here at all, and the toggle is a CSS checkbox: fit-to-width or the
-    native 1568px, with the page scrolling. For free zooming, open the JPEG itself in a tab -
-    the browser's image viewer handles it, and navigating a tab there works even though a
-    link inside the page does not.
-
-    Do not link the image to the original file. It looks right and fails: the pane renders
-    a local page as a static snapshot with no base URL, so a `file:///C:/Users/.../shots/
-    009.jpg` href gets resolved against the *project* folder and the click lands on a file
-    that is not there. The page prints the real path instead.
-    """
-    img = rec / file
-    if not img.exists():
-        raise SystemExit(f"{img} is missing from the recording")
-    data = base64.b64encode(img.read_bytes()).decode()
-    stamp = f" &middot; {t}" if t else ""
-    html = (f"<!doctype html><meta charset=utf-8><title>{label} - {rec.name}</title>"
-            f"<style>{PAGE_CSS}</style>"
-            f"<h1>{label}</h1><p class=sub>{rec.name}{stamp} &middot; {file} &middot; {note}</p>"
-            f'<input type=checkbox class=zt id=z><label class=zl for=z></label>'
-            f'<figure><img src="data:image/jpeg;base64,{data}" alt="{label}"></figure>'
-            f'<p class=hint>The button switches between fit-to-width and 1568px. For free '
-            f'zooming, open the image itself in a tab: <code>{img}</code></p>')
-    out = rec / name
-    out.write_text(html, encoding="utf-8")
-    sys.stderr.write("[marker_view] wrote %s - %d KB, self-contained\n"
-                     % (out, out.stat().st_size // 1024))
-    return out
+def write_one(rec: Path, file: str, label: str, t: str, note: str, name: str,
+              context: bool = True) -> Path:
+    """One question per page: the moment, with the full frame either side of it."""
+    t_ms = int(float(t.rstrip("s")) * 1000) if t else 0
+    if context and t_ms:
+        items = with_context(rec, t_ms, file, label, note)
+    else:
+        items = [(file, label, t, note)]
+    return render_page(rec, items, label, name)
 
 
-def write_page(rec: Path, markers: list, also: list) -> Path:
-    """A plain local page of the marked moments, opened in the browser pane.
+def render_page(rec: Path, items: list, title: str, name: str) -> Path:
+    """Write a self-contained page from (file, label, stamp, note) items.
 
-    The images are inlined as data URIs, written into the file by this script. That is the
-    point: base64 was never the problem, transcribing it through a response was. Here the
-    bytes go from disk to disk, so nothing can corrupt them, and they stay full resolution.
+    The images are inlined as data URIs by this script. That is the point: base64 was
+    never the problem, transcribing it through a response was. Here the bytes go from
+    disk to disk, so nothing can corrupt them, and they stay full resolution.
 
     Inlining is also what makes the page work at all in the browser pane. A file outside
     the project folder renders there as a static snapshot rather than being served, so a
-    relative `src="shots/009.jpg"` does not resolve and every image comes out blank. A
-    self-contained page has nothing to resolve.
+    relative `src="shots/009.jpg"` does not resolve and every image comes out blank. And
+    nothing here relies on JavaScript or on links, because the snapshot runs neither.
     """
-    items = []
-    for m in markers:
-        if m.get("file"):
-            label = f"marker {m['index']}"
-            note = m.get("note") or "not described yet"
-            items.append((m["file"], label, f"{m['t'] / 1000:.1f}s", note))
-    for spec in also:
-        f, _, cap = spec.partition(":")
-        items.append((f, cap or f, "", "nearest frame, no marker recorded here"))
-    if not items:
-        raise SystemExit("nothing to show - no marker had an image, and no --also was given")
+    from PIL import Image
 
     rows = []
-    for f, label, t, note in items:
+    for f, label, stamp, note in items:
         img = rec / f
         if not img.exists():
             sys.stderr.write("[marker_view] skipping missing %s\n" % f)
             continue
         data = base64.b64encode(img.read_bytes()).decode()
-        from PIL import Image
-        dims = Image.open(img).size
-        stamp = f" &middot; {t}" if t else ""
+        w, h = Image.open(img).size
         n = len(rows) + 1
-        native = "" if not dims else f" &middot; {dims[0]}x{dims[1]}"
-        rows.append(f'<section><figcaption><b>{label}</b>{stamp} &middot; {f}{native} '
-                    f'&middot; {note}</figcaption>'
+        when = f" &middot; {stamp}" if stamp else ""
+        rows.append(f'<section><figcaption><b>{label}</b>{when} &middot; {f} '
+                    f'&middot; {w}x{h} &middot; {note}</figcaption>'
                     f'<input type=checkbox class=zt id=z{n}><label class=zl for=z{n}></label>'
                     f'<figure><img src="data:image/jpeg;base64,{data}" alt="{label}"></figure>'
                     f'</section>')
     if not rows:
         raise SystemExit("none of the requested frames exist on disk")
-    html = (f"<!doctype html><meta charset=utf-8><title>Marked moments - {rec.name}</title>"
+
+    html = (f"<!doctype html><meta charset=utf-8><title>{title} - {rec.name}</title>"
             f"<style>{PAGE_CSS}</style>"
-            f"<h1>Marked moments</h1><p class=sub>{rec.name} &middot; {len(items)} frame(s)</p>"
+            f"<h1>{title}</h1><p class=sub>{rec.name} &middot; {len(rows)} frame(s)</p>"
             + "".join(rows))
-    out = rec / "markers.html"
+    out = rec / name
     out.write_text(html, encoding="utf-8")
     sys.stderr.write("[marker_view] wrote %s - %d frame(s), %d KB, self-contained\n"
                      % (out, len(rows), out.stat().st_size // 1024))
     return out
+
+
+def usable(e: dict) -> bool:
+    """Big enough to be worth looking at in the pane.
+
+    Full frames always are. A region crop is only as wide as whatever changed - 101px in
+    one real case - so anything narrow is skipped rather than stretched into mush.
+    """
+    if e.get("kind") == "full screen":
+        return True
+    r = e.get("region")
+    return bool(r) and r[2] >= MIN_USEFUL_WIDTH
+
+
+def pick_side(rec: Path, t_ms: int, side: str, exclude: str):
+    """The nearest usable frame on one side of a moment, never the moment's own image.
+
+    Restricting this to full frames sounded right and was not: this recording has no full
+    frame between 10.6s and 28.4s, so "before" came out 17.8 seconds away - useless as
+    context. A wide region crop two seconds away says far more. And the marker's own
+    screenshot is itself a full-screen event, so without excluding it "after" was the
+    same picture again.
+    """
+    cands = [e for e in load_shots(rec) if usable(e) and e.get("file") != exclude]
+    if side == "before":
+        cands = [e for e in cands if (e.get("t") or 0) < t_ms]
+    else:
+        cands = [e for e in cands if (e.get("t") or 0) > t_ms]
+    if not cands:
+        return None
+    return min(cands, key=lambda e: abs((e.get("t") or 0) - t_ms))
+
+
+def with_context(rec: Path, t_ms: int, file: str, label: str, note: str) -> list:
+    """A moment plus the nearest usable frame either side of it.
+
+    What a marked step *accomplished* is visible in the difference, not in the single
+    frame: before shows the state it acted on, after shows what it produced. Asking
+    "what did this accomplish" next to one frame asks the user to remember the other two.
+    """
+    items = []
+    b = pick_side(rec, t_ms, "before", file)
+    if b:
+        items.append((b["file"], "before", "%.1fs (%+.1fs)" % ((b["t"] or 0) / 1000,
+                      ((b["t"] or 0) - t_ms) / 1000), "the state this step acted on"))
+    items.append((file, label, "%.1fs" % (t_ms / 1000), note))
+    a = pick_side(rec, t_ms, "after", file)
+    if a:
+        items.append((a["file"], "after", "%.1fs (%+.1fs)" % ((a["t"] or 0) / 1000,
+                      ((a["t"] or 0) - t_ms) / 1000), "what it produced"))
+    return items
+
+
+def write_page(rec: Path, markers: list, also: list) -> Path:
+    items = []
+    for m in markers:
+        if m.get("file"):
+            items.append((m["file"], f"marker {m['index']}", "%.1fs" % (m["t"] / 1000),
+                          m.get("note") or "not described yet"))
+    for spec in also:
+        f, _, cap = spec.partition(":")
+        items.append((f, cap or f, "", "nearest frame, no marker recorded here"))
+    if not items:
+        raise SystemExit("nothing to show - no marker had an image, and no --also was given")
+    return render_page(rec, items, "Marked moments", "markers.html")
 
 
 def main() -> None:
@@ -262,6 +294,8 @@ def main() -> None:
                     help="show the full-screen frame nearest this timestamp in seconds - use "
                          "this for a moment with no marker, instead of picking a shot by index")
     ap.add_argument("--label", help="heading for a single-frame page")
+    ap.add_argument("--no-context", action="store_true",
+                    help="show only the moment, without the frame either side of it")
     ap.add_argument("--also", action="append", default=[],
                     help="an extra shot to include in --page, as shots/003.jpg[:caption]")
     args = ap.parse_args()
@@ -290,9 +324,11 @@ def main() -> None:
 
     if args.page:
         if args.shot:
-            print(write_one(rec, args.shot, args.label or args.shot, "",
+            t = "%.1fs" % args.at if args.at is not None else ""
+            print(write_one(rec, args.shot, args.label or args.shot, t,
                             "nearest frame, no marker recorded here",
-                            "frame-%s.html" % Path(args.shot).stem).as_uri())
+                            "frame-%s.html" % Path(args.shot).stem,
+                            not args.no_context).as_uri())
         elif args.index is not None:
             ms = [m for m in load_markers(rec) if m["index"] == args.index]
             if not ms:
@@ -302,7 +338,7 @@ def main() -> None:
                 raise SystemExit(f"Marker {args.index} has no image.")
             print(write_one(rec, m["file"], args.label or f"marker {args.index}",
                             f"{m['t'] / 1000:.1f}s", m.get("note") or "not described yet",
-                            "marker-%d.html" % args.index).as_uri())
+                            "marker-%d.html" % args.index, not args.no_context).as_uri())
         else:
             print(write_page(rec, load_markers(rec), args.also).as_uri())
         return

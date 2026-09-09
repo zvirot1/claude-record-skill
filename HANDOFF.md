@@ -729,3 +729,24 @@ the user was not looking at. Each frame now carries its own CSS `actual size` to
 `<section>` wrapper so the sibling selector cannot reach into the next frame, plus its native
 dimensions in the caption. That last part matters: `101x94` in the caption explains why the toggle
 does nothing interesting for a crop, instead of leaving the user to wonder.
+
+## Before, the moment, after (2026-09-09)
+
+The user's fix, and the right one: a marker page now shows **three** frames - the nearest usable
+frame before, the marker's own, and the nearest after. What a step accomplished is visible in the
+difference; a single frame asks the user to remember the other two. Captions carry each
+neighbour's offset (`-2.3s`, `+2.8s`) so a distant frame is not read as the moment itself.
+
+Two bugs in the first version of this, both caught by reading the generated captions:
+
+- **"before" landed 17.8 seconds away.** Restricting neighbours to full frames sounded right and
+  was not: this recording has no full frame between 10.6s and 28.4s. A wide region crop two
+  seconds away carries far more. The rule is now *usable* rather than *full*: a full screen, or a
+  region crop at least 400px wide. Narrow crops stay excluded - that is the 101x94 case that
+  rendered as mush when stretched.
+- **"after" was the marker's own picture again.** A marker's screenshot is itself a full-screen
+  event, so without excluding it, the nearest frame after 28.4s was the 28.6s marker shot at
+  +0.2s. The moment's own file is now excluded from both sides.
+
+`--no-context` falls back to a single frame. `render_page()` was split out so the overview,
+single-marker and `--at` paths all build item lists and share one renderer.

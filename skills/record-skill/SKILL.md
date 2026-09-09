@@ -135,12 +135,20 @@ marker line. So for every marker that has no description:
    python3 .../marker_view.py <recording> --page                       # all of them at once
    ```
 
-   Use `--at <seconds>` rather than naming a shot by index. **Prefer full frames.** A marker's
-   image always is one, but a frame merely near an unmarked moment is often a region crop, and
-   those are unpredictably small - one in this project's own recording is 101x94, which stretched
-   to the pane's width is unreadable mush. `--at` picks the nearest full frame; a hand-picked shot
-   under 400px wide is flagged. Each frame carries a CSS `actual size` toggle and its native
-   dimensions in the caption, so the user can expand the one they need.
+Each page shows **three frames by default: before, the moment, after** - because what a step
+   accomplished is visible in the difference, not in one picture. Before is the state it acted on,
+   after is what it produced; asking "what did this accomplish" next to a single frame asks the
+   user to remember the other two. The captions carry each frame's offset (`-2.3s`, `+2.8s`) so a
+   distant one is not mistaken for the moment itself. `--no-context` shows the moment alone.
+
+   Use `--at <seconds>` rather than naming a shot by index, and let it choose the neighbours. A
+   frame is only offered if it is **usable**: a full screen, or a region crop at least 400px wide.
+   Narrow crops are skipped - one in this project's own recording is 101x94, unreadable when
+   stretched - and a hand-picked shot under 400px is flagged. Restricting the neighbours to full
+   frames *only* was tried and was worse: with no full frame nearby, "before" came out 17.8
+   seconds away, where a wide crop two seconds away said far more.
+
+   Each frame carries a CSS `actual size` toggle and its native dimensions in the caption.
 
    One frame per page, at the pane's full width, is far more legible than several stacked - and the
    pane holds it while you ask, so the user is looking at the moment as they answer.
