@@ -130,10 +130,17 @@ marker line. So for every marker that has no description:
    self-contained page into the recording and prints its `file://` URL; navigate the pane there:
 
    ```bash
-   python3 .../marker_view.py <recording> 1 --page --label "marker 1"        # one marker
-   python3 .../marker_view.py <recording> --page --shot shots/003.jpg        # a frame with no marker
-   python3 .../marker_view.py <recording> --page                            # all of them at once
+   python3 .../marker_view.py <recording> 1 --page --label "marker 1"   # one marker
+   python3 .../marker_view.py <recording> --page --at 11.7              # a moment with no marker
+   python3 .../marker_view.py <recording> --page                       # all of them at once
    ```
+
+   Use `--at <seconds>` rather than naming a shot by index. **Prefer full frames.** A marker's
+   image always is one, but a frame merely near an unmarked moment is often a region crop, and
+   those are unpredictably small - one in this project's own recording is 101x94, which stretched
+   to the pane's width is unreadable mush. `--at` picks the nearest full frame; a hand-picked shot
+   under 400px wide is flagged. Each frame carries a CSS `actual size` toggle and its native
+   dimensions in the caption, so the user can expand the one they need.
 
    One frame per page, at the pane's full width, is far more legible than several stacked - and the
    pane holds it while you ask, so the user is looking at the moment as they answer.

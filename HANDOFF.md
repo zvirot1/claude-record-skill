@@ -705,3 +705,27 @@ carrying controls that do nothing is worse than a page without them.
 Worth keeping as a technique: when a capability cannot be observed from outside, ship something
 whose visible state answers the question. It cost one round trip and produced a fact rather than
 another assumption - which, in this project, is the difference that has mattered every time.
+
+## The full-frame rule, and a per-frame size toggle (2026-09-09)
+
+Two display bugs, both found by the user looking at the result.
+
+**Small crops were being stretched.** The page had `img { width:100% }`, so a region crop blown up
+to the pane's width came out as mush - `shots/015.jpg` in this recording is **101x94**. Now
+`max-width:100%; width:auto`: a large frame shrinks to fit, a small one stays its own size.
+
+**And the choice of frame was wrong in the first place.** Region crops are unpredictable in size,
+so a frame picked by index near an unmarked moment is a gamble. `--at <seconds>` now finds the
+nearest **full screen** frame and says how far off it is:
+
+    [marker_view] nearest full frame to 11.7s is shots/003.jpg at 10.6s (-1.1s)
+
+A hand-picked shot under 400px wide is flagged with a pointer to `--at`. A marker's own image is
+always a full frame, so markers were never affected - only the frames near moments where the hotkey
+was missed, which is exactly where this came up.
+
+**The overview page had no size toggle at all** - only the single-frame page did, which is the page
+the user was not looking at. Each frame now carries its own CSS `actual size` toggle, scoped by a
+`<section>` wrapper so the sibling selector cannot reach into the next frame, plus its native
+dimensions in the caption. That last part matters: `101x94` in the caption explains why the toggle
+does nothing interesting for a crop, instead of leaving the user to wonder.

@@ -123,10 +123,12 @@ with no description:
    reduction: `python3 .../marker_view.py <recording> 1 --crop x,y,w,h --html`.
 
    **Open it in the browser pane, one frame per question**, with
-   `marker_view.py <recording> N --page` (or `--page --shot shots/003.jpg` for a moment with no
-   marker). It writes a self-contained page into the recording and prints its `file://` URL;
-   navigate the pane there. One frame at the pane's full width beats several stacked, and it stays
-   on screen while the user answers.
+   `marker_view.py <recording> N --page` - or `--page --at 11.7` for a moment with no marker,
+   which picks the nearest **full frame**. Prefer full frames: a frame merely near a moment is
+   often a region crop, and those are unpredictably small (101x94 in one real case), unreadable
+   when stretched to the pane's width. A hand-picked shot under 400px is flagged. The page prints
+   each frame's native size and carries a CSS `actual size` toggle. Navigate the pane to the URL
+   it prints; the frame stays on screen while the user answers.
 
    Three rules, each learned by getting it wrong: let the **script that builds the page** write
    the base64 (reproducing it through a response corrupts it - frames came out blank and striped);

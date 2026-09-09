@@ -8,15 +8,20 @@ it in the conversation is a different job: an inline image has to be embedded as
 base64 data URI, which travels through the model's context as text, so it has to be
 small. This does that reduction - and only for the images actually being shown.
 
-  python marker_view.py <recording-dir>                  # list the markers and sizes
-  python marker_view.py <recording-dir> 1                # data URI for marker 1
-  python marker_view.py <recording-dir> 1 --crop 785,160,780,485
-  python marker_view.py <recording-dir> 1 --width 640 --quality 65
-  python marker_view.py <recording-dir> 1 --html         # ready-to-paste widget snippet
+  python marker_view.py <rec>                      # list the markers and their sizes
+  python marker_view.py <rec> --page              # one page with every marked moment
+  python marker_view.py <rec> 1 --page            # one page for marker 1 alone
+  python marker_view.py <rec> --page --at 11.7    # a moment with no marker, nearest full frame
+  python marker_view.py <rec> 1                   # a data URI, for embedding elsewhere
 
-Check the size before embedding: --list prints what each marker would cost. Crop to the
-region that carries the answer rather than shrinking the whole frame - a dialog cropped
-to 560px stays readable where a full frame at 560px does not.
+For display, open a --page in the browser pane. Prefer full frames: a marker's image
+always is one, but a frame near an unmarked moment is often a region crop, and one in
+this project's own recording is 101x94 - stretched to a pane's width it is unreadable.
+--at picks the nearest full frame for you, and a too-small shot is flagged.
+
+The page is self-contained (images inlined by this script, never through a response),
+carries a CSS size toggle per frame, and ships no JavaScript - the pane renders a local
+file as a static snapshot, so scripts do not run and links do not resolve.
 """
 import argparse
 import base64
@@ -46,6 +51,34 @@ def load_markers(rec: Path) -> list:
     for m in out:
         m["note"] = notes.get(m.get("index"), "")
     return out
+
+
+MIN_USEFUL_WIDTH = 400
+
+
+def load_shots(rec: Path) -> list:
+    out = []
+    for line in (rec / "events.jsonl").read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        e = json.loads(line)
+        if e.get("type") == "screenshot":
+            out.append(e)
+    return out
+
+
+def nearest_full(rec: Path, t_ms: int):
+    """The full-screen frame closest in time to a moment.
+
+    Region crops are the wrong thing to display: their size is unpredictable - one in
+    this project's own recording is 101x94 - and stretching that to a pane's width turns
+    it into mush. A marker's own image is always a full frame; a frame merely *near* a
+    moment often is not, so pick deliberately rather than by index.
+    """
+    full = [e for e in load_shots(rec) if e.get("kind") == "full screen"]
+    if not full:
+        return None
+    return min(full, key=lambda e: abs((e.get("t") or 0) - t_ms))
 
 
 def encode(path: Path, crop, width: int, quality: int):
@@ -93,10 +126,12 @@ body { margin:0; padding:20px; font:14px/1.6 system-ui,sans-serif;
        background:#faf9f7; color:#1a1a18 }
 h1 { font-size:17px; font-weight:500; margin:0 0 4px }
 p.sub { margin:0 0 18px; color:#6b6b66 }
-figure { margin:0 0 26px }
-figcaption { font-size:13px; color:#6b6b66; margin:0 0 8px }
+section { margin:0 0 30px }
+figure { margin:0 }
+figcaption { display:block; font-size:13px; color:#6b6b66; margin:0 0 8px }
 figcaption b { color:#1a1a18; font-weight:500 }
-img { width:100%; height:auto; display:block; border:1px solid #e0ded9; border-radius:8px }
+img { max-width:100%; width:auto; height:auto; display:block;
+      border:1px solid #e0ded9; border-radius:8px }
 p.hint { margin:0 0 12px; font-size:13px; color:#6b6b66 }
 code { font:12px ui-monospace,monospace; color:#4a4a45 }
 input.zt { position:absolute; opacity:0; width:0; height:0 }
@@ -105,7 +140,7 @@ label.zl { display:inline-block; margin:0 0 12px; padding:5px 12px; font:13px in
 label.zl:hover { background:#efede8 }
 label.zl:after { content:"actual size" }
 input.zt:checked ~ label.zl:after { content:"fit to width" }
-input.zt:checked ~ figure img { width:auto; max-width:none }
+input.zt:checked ~ figure img { max-width:none }
 @media (prefers-color-scheme: dark) {
   body { background:#1a1a18; color:#f0efec }
   p.sub, figcaption { color:#9b9b95 }
@@ -186,10 +221,16 @@ def write_page(rec: Path, markers: list, also: list) -> Path:
             sys.stderr.write("[marker_view] skipping missing %s\n" % f)
             continue
         data = base64.b64encode(img.read_bytes()).decode()
+        from PIL import Image
+        dims = Image.open(img).size
         stamp = f" &middot; {t}" if t else ""
-        rows.append(f'<figure><figcaption><b>{label}</b>{stamp} &middot; {f} &middot; {note}'
-                    f'</figcaption><img src="data:image/jpeg;base64,{data}" alt="{label}">'
-                    f'</figure>')
+        n = len(rows) + 1
+        native = "" if not dims else f" &middot; {dims[0]}x{dims[1]}"
+        rows.append(f'<section><figcaption><b>{label}</b>{stamp} &middot; {f}{native} '
+                    f'&middot; {note}</figcaption>'
+                    f'<input type=checkbox class=zt id=z{n}><label class=zl for=z{n}></label>'
+                    f'<figure><img src="data:image/jpeg;base64,{data}" alt="{label}"></figure>'
+                    f'</section>')
     if not rows:
         raise SystemExit("none of the requested frames exist on disk")
     html = (f"<!doctype html><meta charset=utf-8><title>Marked moments - {rec.name}</title>"
@@ -217,12 +258,35 @@ def main() -> None:
     ap.add_argument("--page", action="store_true",
                     help="write markers.html into the recording and print its file:// URL, for "
                          "opening in the browser pane beside the conversation")
+    ap.add_argument("--at", type=float,
+                    help="show the full-screen frame nearest this timestamp in seconds - use "
+                         "this for a moment with no marker, instead of picking a shot by index")
     ap.add_argument("--label", help="heading for a single-frame page")
     ap.add_argument("--also", action="append", default=[],
                     help="an extra shot to include in --page, as shots/003.jpg[:caption]")
     args = ap.parse_args()
 
     rec = args.recording.expanduser().resolve()
+
+    if args.at is not None:
+        t_ms = int(args.at * 1000)
+        e = nearest_full(rec, t_ms)
+        if not e:
+            raise SystemExit("this recording has no full-screen frame to show")
+        off = ((e.get("t") or 0) - t_ms) / 1000
+        sys.stderr.write("[marker_view] nearest full frame to %.1fs is %s at %.1fs (%+.1fs)\n"
+                         % (args.at, e["file"], (e.get("t") or 0) / 1000, off))
+        args.shot = e["file"]
+        if not args.label:
+            args.label = "%.1fs" % args.at
+
+    if args.shot:
+        from PIL import Image
+        w = Image.open(rec / args.shot).size[0] if (rec / args.shot).exists() else 0
+        if 0 < w < MIN_USEFUL_WIDTH:
+            sys.stderr.write("[marker_view] note: %s is only %dpx wide - a region crop. "
+                             "For display prefer a full frame, e.g. --at <seconds>.\n"
+                             % (args.shot, w))
 
     if args.page:
         if args.shot:
