@@ -301,3 +301,37 @@ Cowork runs its tools in a Linux VM. A skill step that needs the user's own desk
 there; file, shell and API steps run anywhere. The generated plugin README says so, and
 `calc-exercise` marks its Windows-calculator section host-only while computing with `python3` or
 `py -3` depending on the environment.
+
+## Cowork verification: both plugins run there (2026-09-09)
+
+Confirmed in a Cowork session by the user, after Save plugin and a new session.
+
+**`/calc-exercise 127*43`** -> `127 * 43 = 5461`, with the activity line reading
+"Read a file, ran a command". Both halves matter: "read a file" is the generated
+`commands/calc-exercise.md` wrapper pulling in
+`${CLAUDE_PLUGIN_ROOT}/skills/calc-exercise/SKILL.md`, and "ran a command" means it
+computed the answer instead of doing mental math, which is the skill's central rule.
+
+**`/latest-email`** -> "Loaded tools, used Gmail integration, read a file", then the newest
+inbox message summarised, with the conclusion that it was marketing with nothing actionable.
+No browser, no clicks.
+
+Two things this settles:
+
+1. **The `commands/*.md` wrapper is what makes a slash command work in Cowork.** Before it,
+   `/record-skill` and `/record-skill-local:record-skill` both returned "Unknown skill" with the
+   plugin correctly installed. `package_plugin.py` generates the wrapper, and the slash command
+   resolved on the first try for both skills.
+2. **The Gmail connector is available inside Cowork.** `latest-email` reached it from there, so a
+   connector-based skill built on the host runs unchanged in Cowork. That was an open question.
+
+Still untested, and cheap to check when convenient: the description-trigger route in Cowork (only
+the slash commands were exercised), the operator-precedence case (`2+3*4` must be 14, not 20), the
+host-only branch (asking for the Windows calculator from Cowork should decline and give the number),
+and which Python actually ran - `python3` inside the VM or `py -3` on the host through Windows-MCP.
+
+### The pipeline, end to end
+A workflow recorded on the host with `record.py`, analysed for its outcome rather than its
+gestures, drafted as a SKILL.md, installed with `save_skill.py` for Claude Code and packaged with
+`package_plugin.py` for Cowork - two skills through it now, and nothing stored in a cloud account
+at any step.
