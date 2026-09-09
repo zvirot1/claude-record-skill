@@ -761,3 +761,36 @@ Also settled: the question dialog is plain text fields - a question string, opti
 descriptions. It renders no images and no clickable links, so the most a question can carry is the
 frame's **path as text**. That is worth doing anyway, since it survives the pane being navigated
 elsewhere.
+
+## Two pages, two tabs - and three corrections about the pane (2026-09-09)
+
+The user's refinement: open **two** pages at the start of a round of questions - one with the whole
+run, one with the current question - rather than one page trying to do both.
+
+- `overview.html` (`--timeline`): every usable frame in order, downscaled to 700px, each captioned
+  with its timestamp *and the actions that produced it*, read from `events.jsonl`
+  (`typed "note" | pressed Backspace`). 22 frames, 466 KB for this recording. It is what turns a
+  pile of screenshots into a legible process, and the caption text is the part that does the work.
+- `view.html`: the current question - before, the moment, after - at full size, re-navigated in a
+  second tab per question.
+
+Split by job, not by whim: the timeline is for orientation, so it can be small; the question page
+is where a dialog has to be readable, so it stays full size. All frames at full size would be
+megabytes in one data: document.
+
+### Three things about the pane that were wrong in these notes
+1. **JavaScript does run.** The earlier note said it does not, on the evidence of a page that
+   reported its own state - but the negative result was about *that script*, not the platform. A
+   trivial probe and a 154 KB probe both ran. Real scroll-to-zoom, drag-to-pan and a live
+   percentage are back, and verified from here: scrolling on the image took it from 100% to 115%.
+   Lesson: a self-reporting probe only proves something if the probe itself is first shown to work.
+2. **The pane loads the file as a `data:` document.** That single fact explains every earlier
+   failure at once - relative `src="shots/009.jpg"` has no base to resolve against, and a
+   `file://` href resolves against the project folder. Inlining the images, which was arrived at
+   by trial, is the *only* correct approach here.
+3. **Permission is per file path, and tabs are capped.** A new file name prompts again, and each
+   `navigate` to a new URL opens a new tab until the cap is hit (it was, at nine). Hence two fixed
+   names in the project's gitignored `.preview/`, and two long-lived tabs.
+
+A page inside the project folder can also be screenshotted with the page tools, so these pages are
+now verified directly rather than by asking the user whether they rendered.

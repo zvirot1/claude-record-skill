@@ -132,10 +132,20 @@ with no description:
    one real case) are unreadable when stretched. Each frame has a CSS `actual size` toggle and its
    native size in the caption.
 
-   **Navigate the pane and ask in the same turn, pane first.** The frame has to be on screen at
-   the moment the question appears - ask first and the user answers from memory, navigate later
-   and they answer looking at the previous frame. Put the frame's path in the question text too:
-   the dialog is plain text fields, so a path is the only reference that fits inside it.
+   **Two pages, two tabs, two jobs.** `--timeline` writes `overview.html` - every usable frame in
+   order, downscaled, captioned with the actions that produced it - opened once in its own tab
+   before the first question. `N --page --name view.html` writes the current question's page -
+   before, the moment, after, full size - re-navigated in a second tab per question. Do not merge
+   them: a long timeline beside a question splits attention, and a lone frame leaves the user
+   guessing where in the run they are.
+
+   Write both into the project's gitignored `.preview/` and reuse those two names: the pane asks
+   permission per file path, so two stable names are approved once rather than once per question,
+   and a page inside the project can be inspected directly - verify it yourself instead of asking.
+
+   **Navigate the pane and ask in the same turn, pane first.** Ask first and the user answers from
+   memory; navigate later and they answer looking at the previous frame. Put the frame's path in
+   the question text too: the dialog is plain text fields.
 
    Three rules, each learned by getting it wrong: let the **script that builds the page** write
    the base64 (reproducing it through a response corrupts it - frames came out blank and striped);

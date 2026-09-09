@@ -150,11 +150,31 @@ Each page shows **three frames by default: before, the moment, after** - because
 
    Each frame carries a CSS `actual size` toggle and its native dimensions in the caption.
 
-   **Navigate the pane and ask in the same turn, pane first.** The image has to be on screen at
-   the moment the question appears, not before it and not after: ask first and the user answers
-   from memory; navigate later and they answer looking at the previous frame. One turn, two calls,
-   in that order. Put the frame's path in the question text as well - the question dialog is
-   plain text fields, so a path is the only reference that can live inside it.
+   **Two pages, two tabs, two jobs.** Open both into the project's gitignored `.preview/`:
+
+   ```bash
+   python3 .../marker_view.py <recording> --timeline --to .preview      # overview.html
+   python3 .../marker_view.py <recording> N --page --to .preview --name view.html
+   ```
+
+   - `overview.html` - **the whole run**: every usable frame in order, downscaled, each captioned
+     with its timestamp and the actions that produced it. Open it once, in its own tab, before the
+     first question. It is what makes the process legible rather than a pile of screenshots.
+   - `view.html` - **the current question**: before, the moment, after, at full size. Re-navigate
+     the same tab for each question.
+
+   Do not merge them. A long timeline beside a question splits attention exactly the wrong way,
+   and a single frame with no timeline leaves the user guessing where in the run they are.
+
+   **Write inside the project folder, and reuse these two file names.** The pane asks permission
+   per file path, so two stable names are approved once instead of once per question - and a page
+   inside the project can be inspected directly, so verify it yourself rather than asking the user
+   whether it rendered. Keep the folder gitignored: these pages carry screen captures.
+
+   **Navigate the pane and ask in the same turn, pane first.** The frame has to be on screen at
+   the moment the question appears: ask first and the user answers from memory; navigate later and
+   they answer looking at the previous frame. Put the frame's path in the question text as well -
+   the dialog is plain text fields, so a path is the only reference that fits inside it.
 
    One frame per page, at the pane's full width, is far more legible than several stacked - and the
    pane holds it while you ask, so the user is looking at the moment as they answer.
