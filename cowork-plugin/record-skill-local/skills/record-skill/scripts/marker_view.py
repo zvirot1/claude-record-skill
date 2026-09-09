@@ -67,24 +67,6 @@ def load_shots(rec: Path) -> list:
     return out
 
 
-def nearest_full(rec: Path, t_ms: int, side: str = None):
-    """The full-screen frame closest in time to a moment, optionally on one side of it.
-
-    Region crops are the wrong thing to display: their size is unpredictable - one in
-    this project's own recording is 101x94 - and stretching that to a pane's width turns
-    it into mush. A marker's own image is always a full frame; a frame merely *near* a
-    moment often is not, so pick deliberately rather than by index.
-    """
-    full = [e for e in load_shots(rec) if e.get("kind") == "full screen"]
-    if side == "before":
-        full = [e for e in full if (e.get("t") or 0) < t_ms]
-    elif side == "after":
-        full = [e for e in full if (e.get("t") or 0) > t_ms]
-    if not full:
-        return None
-    return min(full, key=lambda e: abs((e.get("t") or 0) - t_ms))
-
-
 def encode(path: Path, crop, width: int, quality: int):
     from PIL import Image
 
@@ -304,11 +286,12 @@ def main() -> None:
 
     if args.at is not None:
         t_ms = int(args.at * 1000)
-        e = nearest_full(rec, t_ms)
+        cands = [x for x in load_shots(rec) if usable(x)]
+        e = min(cands, key=lambda x: abs((x.get("t") or 0) - t_ms)) if cands else None
         if not e:
-            raise SystemExit("this recording has no full-screen frame to show")
+            raise SystemExit("this recording has no frame big enough to show")
         off = ((e.get("t") or 0) - t_ms) / 1000
-        sys.stderr.write("[marker_view] nearest full frame to %.1fs is %s at %.1fs (%+.1fs)\n"
+        sys.stderr.write("[marker_view] nearest usable frame to %.1fs is %s at %.1fs (%+.1fs)\n"
                          % (args.at, e["file"], (e.get("t") or 0) / 1000, off))
         args.shot = e["file"]
         if not args.label:

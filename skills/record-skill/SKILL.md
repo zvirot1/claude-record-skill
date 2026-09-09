@@ -150,6 +150,12 @@ Each page shows **three frames by default: before, the moment, after** - because
 
    Each frame carries a CSS `actual size` toggle and its native dimensions in the caption.
 
+   **Navigate the pane and ask in the same turn, pane first.** The image has to be on screen at
+   the moment the question appears, not before it and not after: ask first and the user answers
+   from memory; navigate later and they answer looking at the previous frame. One turn, two calls,
+   in that order. Put the frame's path in the question text as well - the question dialog is
+   plain text fields, so a path is the only reference that can live inside it.
+
    One frame per page, at the pane's full width, is far more legible than several stacked - and the
    pane holds it while you ask, so the user is looking at the moment as they answer.
 

@@ -130,8 +130,12 @@ with no description:
    (`-2.3s`, `+2.8s`). `--no-context` shows the moment alone. A frame is offered only if it is
    usable - a full screen, or a region crop at least 400px wide - since narrow crops (101x94 in
    one real case) are unreadable when stretched. Each frame has a CSS `actual size` toggle and its
-   native size in the caption. Navigate the pane to the URL it prints; it stays on screen while
-   the user answers.
+   native size in the caption.
+
+   **Navigate the pane and ask in the same turn, pane first.** The frame has to be on screen at
+   the moment the question appears - ask first and the user answers from memory, navigate later
+   and they answer looking at the previous frame. Put the frame's path in the question text too:
+   the dialog is plain text fields, so a path is the only reference that fits inside it.
 
    Three rules, each learned by getting it wrong: let the **script that builds the page** write
    the base64 (reproducing it through a response corrupts it - frames came out blank and striped);

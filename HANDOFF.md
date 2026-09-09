@@ -750,3 +750,14 @@ Two bugs in the first version of this, both caught by reading the generated capt
 
 `--no-context` falls back to a single frame. `render_page()` was split out so the overview,
 single-marker and `--at` paths all build item lists and share one renderer.
+
+## Pane first, then the question - in the same turn (2026-09-09)
+
+The skill said to navigate the pane to the generated page, but not *when*. That gap matters: ask
+before navigating and the user answers from memory; navigate after asking and they answer while
+looking at the previous frame. Both copies now require the two calls in one turn, pane first.
+
+Also settled: the question dialog is plain text fields - a question string, option labels and
+descriptions. It renders no images and no clickable links, so the most a question can carry is the
+frame's **path as text**. That is worth doing anyway, since it survives the pane being navigated
+elsewhere.
