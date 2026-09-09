@@ -640,3 +640,41 @@ now ranks them: give the path and describe the frame (always, free, exact), send
 This is the sixth time in this project that a failure traced back to an assumption written as
 fact. The pattern is now explicit in the skill's step 3b, and this instance is worth keeping
 because the failing assumption was one the skill itself asserted.
+
+## Showing a marked moment: the browser pane (2026-09-09)
+
+The user's suggestion, and the right answer: open the frame in the **browser pane** beside the
+conversation. `marker_view.py --page` writes a self-contained HTML page into the recording and
+prints its `file://` URL; navigating the pane there puts the moment on screen while the question
+is asked, at full 1568px resolution.
+
+Four attempts, each failing differently, are why the final shape is what it is:
+
+1. **`SendUserFile`** renders a file card - `009.jpg 118.3KB` - even with `display: "render"`.
+2. **base64 in the visual widget**: the only route that puts an image *in* the conversation, and
+   it corrupts. Two frames came out blank and blue-striped. The sources were valid JPEGs under
+   `b64decode(validate=True)`; the damage was in the response. The user asked why *their* pasted
+   screenshots always render - because those bytes never pass through the response. The lesson is
+   narrower than "avoid base64": let the **script** write it, disk to disk.
+3. **A page with relative `src="shots/009.jpg"`**: every image blank. The pane renders a file
+   outside the project folder as a static snapshot rather than serving it, so relative references
+   resolve to nothing. Inlining the images as data URIs fixed it - written by the script.
+4. **Wrapping the image in a link to the original**, for real zoom: looked right, failed. An
+   absolute `file:///C:/Users/.../shots/009.jpg` href got resolved against the project folder and
+   the click landed on `C:\dev\claude-record-skill\shots\009.jpg`. Removed; the page prints the
+   real path as text and the browser's own zoom works on the page.
+
+Also from this round: one frame per page rather than all of them stacked, since the point is that
+the user can see *which* moment is being asked about; `--label` for the heading; and `--also` /
+`--shot` for moments that have no marker because the hotkey was missed.
+
+### The walkthrough, run for real
+With each frame in the pane, asked one structured question per moment. All three answered,
+including the two the user had earlier said they could not remember - seeing the frame was what
+made them answerable:
+
+- marker 1 (28.4s): the Documents folder *and* the type plus encoding both matter.
+- 11.7s: Notepad opened and ready for input, the start of a cycle.
+- 92.7s: the second address had been typed.
+
+Written to `notes.md` in the recording, so they survive the session.

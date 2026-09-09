@@ -87,6 +87,105 @@ def snippet(b64: str, label: str, t_ms) -> str:
             f'{caption}</p></div></div>')
 
 
+PAGE_CSS = """
+:root { color-scheme: light dark }
+body { margin:0; padding:20px; font:14px/1.6 system-ui,sans-serif;
+       background:#faf9f7; color:#1a1a18 }
+h1 { font-size:17px; font-weight:500; margin:0 0 4px }
+p.sub { margin:0 0 18px; color:#6b6b66 }
+figure { margin:0 0 26px }
+figcaption { font-size:13px; color:#6b6b66; margin:0 0 8px }
+figcaption b { color:#1a1a18; font-weight:500 }
+img { width:100%; height:auto; display:block; border:1px solid #e0ded9; border-radius:8px }
+p.hint { margin:0 0 14px; font-size:13px; color:#6b6b66 }
+code { font:12px ui-monospace,monospace; color:#4a4a45 }
+@media (prefers-color-scheme: dark) {
+  body { background:#1a1a18; color:#f0efec }
+  p.sub, figcaption { color:#9b9b95 }
+  figcaption b { color:#f0efec }
+  img { border-color:#3a3a36 }
+  code { color:#b5b5ae }
+}
+"""
+
+
+def write_one(rec: Path, file: str, label: str, t: str, note: str, name: str) -> Path:
+    """One frame per page, so the question being asked has the pane to itself.
+
+    A single image at the pane's full width is far more legible than three stacked.
+
+    Do not link the image to the original file. It looks right and fails: the pane renders
+    a local page as a static snapshot with no base URL, so a `file:///C:/Users/.../shots/
+    009.jpg` href gets resolved against the *project* folder and the click lands on a file
+    that is not there. The page prints the real path instead, which the user can open, and
+    the browser's own zoom works on the page as it is.
+    """
+    img = rec / file
+    if not img.exists():
+        raise SystemExit(f"{img} is missing from the recording")
+    data = base64.b64encode(img.read_bytes()).decode()
+    stamp = f" &middot; {t}" if t else ""
+    html = (f"<!doctype html><meta charset=utf-8><title>{label} - {rec.name}</title>"
+            f"<style>{PAGE_CSS}</style>"
+            f"<h1>{label}</h1><p class=sub>{rec.name}{stamp} &middot; {file} &middot; {note}</p>"
+            f'<p class=hint>Zoom with Ctrl and the scroll wheel. Full size at '
+            f'<code>{img}</code></p>'
+            f'<figure><img src="data:image/jpeg;base64,{data}" alt="{label}"></figure>')
+    out = rec / name
+    out.write_text(html, encoding="utf-8")
+    sys.stderr.write("[marker_view] wrote %s - %d KB, self-contained\n"
+                     % (out, out.stat().st_size // 1024))
+    return out
+
+
+def write_page(rec: Path, markers: list, also: list) -> Path:
+    """A plain local page of the marked moments, opened in the browser pane.
+
+    The images are inlined as data URIs, written into the file by this script. That is the
+    point: base64 was never the problem, transcribing it through a response was. Here the
+    bytes go from disk to disk, so nothing can corrupt them, and they stay full resolution.
+
+    Inlining is also what makes the page work at all in the browser pane. A file outside
+    the project folder renders there as a static snapshot rather than being served, so a
+    relative `src="shots/009.jpg"` does not resolve and every image comes out blank. A
+    self-contained page has nothing to resolve.
+    """
+    items = []
+    for m in markers:
+        if m.get("file"):
+            label = f"marker {m['index']}"
+            note = m.get("note") or "not described yet"
+            items.append((m["file"], label, f"{m['t'] / 1000:.1f}s", note))
+    for spec in also:
+        f, _, cap = spec.partition(":")
+        items.append((f, cap or f, "", "nearest frame, no marker recorded here"))
+    if not items:
+        raise SystemExit("nothing to show - no marker had an image, and no --also was given")
+
+    rows = []
+    for f, label, t, note in items:
+        img = rec / f
+        if not img.exists():
+            sys.stderr.write("[marker_view] skipping missing %s\n" % f)
+            continue
+        data = base64.b64encode(img.read_bytes()).decode()
+        stamp = f" &middot; {t}" if t else ""
+        rows.append(f'<figure><figcaption><b>{label}</b>{stamp} &middot; {f} &middot; {note}'
+                    f'</figcaption><img src="data:image/jpeg;base64,{data}" alt="{label}">'
+                    f'</figure>')
+    if not rows:
+        raise SystemExit("none of the requested frames exist on disk")
+    html = (f"<!doctype html><meta charset=utf-8><title>Marked moments - {rec.name}</title>"
+            f"<style>{PAGE_CSS}</style>"
+            f"<h1>Marked moments</h1><p class=sub>{rec.name} &middot; {len(items)} frame(s)</p>"
+            + "".join(rows))
+    out = rec / "markers.html"
+    out.write_text(html, encoding="utf-8")
+    sys.stderr.write("[marker_view] wrote %s - %d frame(s), %d KB, self-contained\n"
+                     % (out, len(rows), out.stat().st_size // 1024))
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -98,9 +197,34 @@ def main() -> None:
     ap.add_argument("--width", type=int, default=DEFAULT_WIDTH)
     ap.add_argument("--quality", type=int, default=DEFAULT_QUALITY)
     ap.add_argument("--html", action="store_true", help="emit a widget snippet, not just the URI")
+    ap.add_argument("--page", action="store_true",
+                    help="write markers.html into the recording and print its file:// URL, for "
+                         "opening in the browser pane beside the conversation")
+    ap.add_argument("--label", help="heading for a single-frame page")
+    ap.add_argument("--also", action="append", default=[],
+                    help="an extra shot to include in --page, as shots/003.jpg[:caption]")
     args = ap.parse_args()
 
     rec = args.recording.expanduser().resolve()
+
+    if args.page:
+        if args.shot:
+            print(write_one(rec, args.shot, args.label or args.shot, "",
+                            "nearest frame, no marker recorded here",
+                            "frame-%s.html" % Path(args.shot).stem).as_uri())
+        elif args.index is not None:
+            ms = [m for m in load_markers(rec) if m["index"] == args.index]
+            if not ms:
+                raise SystemExit(f"No marker {args.index}. Run without an index to list them.")
+            m = ms[0]
+            if not m.get("file"):
+                raise SystemExit(f"Marker {args.index} has no image.")
+            print(write_one(rec, m["file"], args.label or f"marker {args.index}",
+                            f"{m['t'] / 1000:.1f}s", m.get("note") or "not described yet",
+                            "marker-%d.html" % args.index).as_uri())
+        else:
+            print(write_page(rec, load_markers(rec), args.also).as_uri())
+        return
 
     if args.shot:
         img = rec / args.shot

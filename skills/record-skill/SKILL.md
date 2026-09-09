@@ -126,24 +126,31 @@ marker line. So for every marker that has no description:
    python3 ~/.claude/skills/record-skill/scripts/marker_view.py <recording> 1 --crop x,y,w,h --html
    ```
 
-   How to show it, in order of reliability - the first two never corrupt, the third sometimes does:
+   **Open it in the browser pane, one frame per question.** `marker_view.py --page` writes a
+   self-contained page into the recording and prints its `file://` URL; navigate the pane there:
 
-   - **Give the path and describe the frame in one line.** Free, exact, and the user can open the
-     file instantly. Do this always; the rest is on top.
-   - **Send the file** (a path-based send). The client may show it as a card rather than inline,
-     but it opens at full quality when clicked.
-   - **Embed it inline** as a base64 data URI in the visual widget. This is the only route that
-     puts the picture *in* the conversation, and the only one that can fail: the bytes have to be
-     reproduced character by character in the response, and a single wrong character destroys the
-     image. It has failed in practice. Keep the payload small - crop to the region that answers the
-     question rather than shrinking the whole frame - and if the result renders wrong, fall back
-     rather than retrying.
+   ```bash
+   python3 .../marker_view.py <recording> 1 --page --label "marker 1"        # one marker
+   python3 .../marker_view.py <recording> --page --shot shots/003.jpg        # a frame with no marker
+   python3 .../marker_view.py <recording> --page                            # all of them at once
+   ```
 
-   An image the *user* attaches always displays correctly, because those bytes never pass through
-   the response. That asymmetry is the whole explanation; it is not something to fix by trying
-   harder.
+   One frame per page, at the pane's full width, is far more legible than several stacked - and the
+   pane holds it while you ask, so the user is looking at the moment as they answer.
 
-   Only shrink what you show. The stored capture stays at full size for your own reading.
+   Three things about this, each learned by getting it wrong:
+
+   - **Let the script write the base64, never the response.** The images are inlined as data URIs
+     by the script, disk to disk. Reproducing base64 through a response corrupts it - two frames
+     came out blank and blue-striped that way. An image the *user* attaches always renders,
+     because those bytes never pass through the response either. That asymmetry is the whole
+     explanation, not something to fix by trying harder.
+   - **The page must be self-contained.** A local file renders in the pane as a static snapshot
+     rather than being served, so relative `src="shots/009.jpg"` references resolve to nothing and
+     every image comes out blank.
+   - **Do not link the image to its file.** Same reason: an absolute `file://` href gets resolved
+     against the project folder and the click lands on a path that does not exist. Print the real
+     path as text instead; the browser's own zoom works on the page as it is.
 3. Ask **what it accomplished** — not what they clicked, which the trajectory already has. Use the
    structured question tool so the user picks rather than composes: 2-4 concrete options drawn
    from the recording, multi-select when the answers are not mutually exclusive ("what varies

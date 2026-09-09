@@ -122,15 +122,17 @@ with no description:
 2. **Show it**, cropped to the part that carries the answer. `marker_view.py` handles the
    reduction: `python3 .../marker_view.py <recording> 1 --crop x,y,w,h --html`.
 
-   In order of reliability: always give the path and describe the frame in one line (free and
-   exact); sending the file by path is also safe though the client may render it as a card; and
-   embedding it inline as base64 in the visual widget is the only route that puts the picture in
-   the conversation and the only one that can fail - the bytes must be reproduced character by
-   character in the response, and one wrong character destroys the image. It has failed in
-   practice. Keep it small, and fall back rather than retrying.
+   **Open it in the browser pane, one frame per question**, with
+   `marker_view.py <recording> N --page` (or `--page --shot shots/003.jpg` for a moment with no
+   marker). It writes a self-contained page into the recording and prints its `file://` URL;
+   navigate the pane there. One frame at the pane's full width beats several stacked, and it stays
+   on screen while the user answers.
 
-   An image the *user* attaches always renders correctly, because those bytes never pass through
-   the response. Only shrink what you show; the stored capture stays full size for your reading.
+   Three rules, each learned by getting it wrong: let the **script** write the base64 (reproducing
+   it through a response corrupts it - frames came out blank and striped); keep the page
+   **self-contained**, since a local file renders as a static snapshot and relative image paths
+   resolve to nothing; and do **not** link the image to its file, because an absolute `file://`
+   href resolves against the project folder and lands on nothing. Print the path as text.
 3. Ask **what it accomplished** - not what they clicked. Use the structured question tool so the
    user picks: 2-4 options drawn from the recording, multi-select where answers are not exclusive,
    free text always available. Derive options from evidence in the trajectory, never invented ones.
