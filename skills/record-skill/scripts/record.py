@@ -89,6 +89,39 @@ SPECIAL_KEY_NAMES = {
 }
 MODIFIERS = {"Cmd", "Win", "Ctrl", "Alt", "AltGr", "Shift"}
 
+# The numeric keypad reports no character, only a virtual key code, so pynput
+# renders it as "<105>". These codes are Windows-specific (macOS and X11 number
+# their keys differently), hence the IS_WINDOWS guard at the call site.
+WIN_NUMPAD_VK = {
+    96: "0", 97: "1", 98: "2", 99: "3", 100: "4", 101: "5", 102: "6", 103: "7",
+    104: "8", 105: "9", 106: "*", 107: "+", 109: "-", 110: ".", 111: "/",
+}
+
+
+def physical_key(key) -> str | None:
+    """Windows: the Latin character engraved on the key that was physically pressed.
+
+    A non-Latin layout translates a keypress to its own alphabet, so Win+R on a
+    Hebrew keyboard arrives as the letter resh and a shortcut becomes unreadable.
+    The scan code is the physical key and does not depend on the layout, so map it
+    back through MapVirtualKey.
+    """
+    if not IS_WINDOWS:
+        return None
+    scan = getattr(key, "_scan", None)
+    if not scan:
+        return None
+    try:
+        import ctypes
+        vk = ctypes.windll.user32.MapVirtualKeyW(int(scan), 1)  # MAPVK_VSC_TO_VK
+    except Exception:
+        return None
+    if 0x41 <= vk <= 0x5A:
+        return chr(vk).lower()
+    if 0x30 <= vk <= 0x39:
+        return chr(vk)
+    return None
+
 
 def enable_dpi_awareness() -> None:
     """Windows: make this process per-monitor DPI aware.
@@ -141,6 +174,7 @@ class Recorder:
         self.shot_index = 0
         self.prev_img = None
         self.typed_buf: list[str] = []
+        self.typed_phys: list[str] = []
         self.typed_t: int | None = None
         self.pressed_mods: set[str] = set()
         self.shift_in_char = False
@@ -167,14 +201,22 @@ class Recorder:
     def flush_typing(self) -> None:
         if self.typed_buf:
             text = "".join(self.typed_buf)
+            keys = "".join(self.typed_phys)
             ev = {"t": self.typed_t, "type": "type"}
             if self.mask_typing:
                 ev["masked"] = True
                 ev["length"] = len(text)
             else:
                 ev["text"] = text
+                # A non-Latin layout records what the layout produced, which is not
+                # necessarily what the application received - pynput caches the layout
+                # and can miss a switch. Keep the physical keys as a second reading, so
+                # "calc" typed on a Hebrew keyboard is still recoverable.
+                if keys != text:
+                    ev["keys"] = keys
             self.emit(ev)
             self.typed_buf = []
+            self.typed_phys = []
             self.typed_t = None
 
     # ---- screenshots -------------------------------------------------
@@ -318,6 +360,12 @@ class Recorder:
                 return None
             self.shift_in_char = True
             return char
+        if IS_WINDOWS:
+            # No character at all: the numeric keypad, which pynput prints as "<105>".
+            np = WIN_NUMPAD_VK.get(getattr(key, "vk", None))
+            if np:
+                self.shift_in_char = True
+                return np
         raw = str(key).replace("Key.", "").strip("'")
         return SPECIAL_KEY_NAMES.get(raw, raw.capitalize())
 
@@ -328,6 +376,13 @@ class Recorder:
         if name in MODIFIERS:
             self.pressed_mods.add(name)
             return
+        # A shortcut names a physical key, not whatever letter the current layout
+        # produces: Win+R on a Hebrew keyboard would otherwise be logged as Win+<resh>,
+        # and a hotkey spelled in Latin could never match it.
+        if len(name) == 1 and ord(name) > 127 and (self.pressed_mods - {"Shift"}):
+            phys = physical_key(key)
+            if phys:
+                name = phys
         if self.matches_combo(self.stop_key, set(self.pressed_mods), name):
             self.stop_evt.set()
             return
@@ -346,6 +401,7 @@ class Recorder:
             if self.typed_t is None:
                 self.typed_t = self.now_ms()
             self.typed_buf.append(name)
+            self.typed_phys.append((physical_key(key) or name) if ord(name) > 127 else name)
             return
         self.flush_typing()
         combo = "+".join(sorted(mods) + [name]) if mods else name
@@ -509,7 +565,10 @@ class Recorder:
                 if e.get("masked"):
                     lines.append(f"{ts} typed [masked, {e['length']} chars]")
                 else:
-                    lines.append(f"{ts} typed {json.dumps(e['text'], ensure_ascii=False)}")
+                    line = f"{ts} typed {json.dumps(e['text'], ensure_ascii=False)}"
+                    if e.get("keys"):
+                        line += f"  (physical keys: {json.dumps(e['keys'], ensure_ascii=False)})"
+                    lines.append(line)
             elif e["type"] == "press":
                 lines.append(f"{ts} pressed {e['key']}")
             elif e["type"] == "note":

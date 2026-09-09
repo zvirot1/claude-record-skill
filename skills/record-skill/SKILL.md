@@ -48,6 +48,11 @@ Stop with **Ctrl+Shift+Q** or Ctrl+C.
 Modifier names in the trajectory follow the OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
 `Cmd` / `Ctrl` / `Alt` on macOS. Translate them when the skill is meant to run on another OS.
 
+A typed line can carry a second reading — `typed "בשךב"  (physical keys: "calc")`. The first is
+what the keyboard layout produced, the second is the keys physically pressed. When they disagree,
+the physical reading is usually what the application actually received (a non-Latin layout, or a
+layout switched mid-recording), so read `calc` as the command and say which one you used.
+
 **This recorder captures no audio**, so the trajectory shows *what* happened but never *why*.
 Two flags carry intent instead, and both are worth suggesting before the user records:
 

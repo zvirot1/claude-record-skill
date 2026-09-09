@@ -215,3 +215,46 @@ on the marker questions.
 Local speech-to-text (a Whisper-class model, hundreds of MB, CPU-bound, with real quality risk for
 Hebrew) is only worth it if narrating hands-free during the workflow turns out to matter more than
 answering one question afterwards.
+
+## Hebrew keyboard and the numeric keypad (2026-09-09)
+
+Found by recording something deliberately trivial - 9 * 18 in the Windows calculator. Three real
+defects, all invisible on a US layout:
+
+11. **The numeric keypad produced no usable input.** Keypad keys report a virtual key code and no
+    character, so pynput renders them as `<105>` and the trajectory read
+    `pressed <105>` / `typed "*"` / `pressed <97>` / `pressed <104>` - the exercise 9*18 was
+    unrecoverable. `WIN_NUMPAD_VK` now maps vk 96-111 to their characters and they join the typed
+    buffer, giving `typed "9*18"`. The codes are Windows-specific (macOS and X11 number keys
+    differently), so the lookup is guarded by `IS_WINDOWS`.
+
+12. **Shortcuts were logged in the layout's alphabet.** With a Hebrew layout active, Win+R came out
+    as `pressed Win+<resh>`. A shortcut names a *physical* key, so `physical_key()` maps the scan
+    code back through `MapVirtualKey(scan, MAPVK_VSC_TO_VK)` - layout-independent - and it is
+    applied when a non-Shift modifier is held. Ctrl-based hotkeys were already safe by accident:
+    Ctrl turns a letter into a control code, and the existing vk recovery caught that, which is
+    why Ctrl+Shift+Q kept working on a Hebrew keyboard while Win+R did not.
+
+13. **Typed text was recorded in the wrong alphabet.** "calc" typed into the Run box came out as
+    `typed "\u05d1\u05e9\u05da\u05d1"` - the Hebrew letters on those keys - even though the box
+    clearly received `calc`, since the calculator opened. pynput caches the keyboard layout and
+    updates it on `WM_INPUTLANGCHANGE`, which its listener thread can miss, so after a layout
+    switch it keeps translating with the old one. Rather than guess which is right, a type event
+    now carries both: `text` as the layout produced it and `keys` as the physical keys, rendered as
+    `typed "\u05d1\u05e9\u05da\u05d1"  (physical keys: "calc")`. Latin typing gets no `keys` field.
+    Both copies of SKILL.md tell Claude to prefer the physical reading when they disagree and to
+    say which it used.
+
+Verified by faking the key events (a `KeyCode` stand-in with `char`, `vk` and `_scan`): keypad
+digits become typed text, no `<105>` press events survive, a scan code recovers the Latin letter,
+Win+resh logs as `Win+r`, Hebrew typing keeps both readings, Latin typing carries no second one,
+and the trajectory renders both. A live run then confirmed no regression: exact click coordinates,
+`typed "9*18"` batched, `pressed Enter`, and a hotkey stop at 29.3s of a 45s budget. The true
+keypad scan codes could not be sent through the automation tool, so that path rests on the faked
+events plus the original recording that exposed it.
+
+### A note on what recordings leave on disk
+The two Gmail recordings from this session contain a client's name, national ID number and
+financial details in the screenshots. `~/.claude/recordings/` is a plain folder with no expiry -
+it is worth deleting a recording once the skill is drafted, and worth preferring subjects with no
+sensitive data (a calculator, a scratch file) when the goal is only to exercise the pipeline.

@@ -61,6 +61,11 @@ Output lands in `~/.claude/recordings/<timestamp>/`:
 Modifier names follow the recording OS: `Ctrl` / `Alt` / `Win` on Windows and Linux,
 `Cmd` / `Ctrl` / `Alt` on macOS. Translate them if the skill will run on a different OS.
 
+A typed line can carry a second reading - `typed "בשךב"  (physical keys: "calc")`.
+The first is what the keyboard layout produced, the second is the keys physically pressed. When
+they disagree the physical reading is usually what the application actually received (a non-Latin
+layout, or one switched mid-recording), so read `calc` as the command and say which you used.
+
 **This recorder captures no audio**, so the trajectory shows *what* happened, never *why*.
 Two flags carry intent instead - suggest both before the user records:
 
